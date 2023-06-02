@@ -10,6 +10,9 @@ import requests
 from lxml import html
 
 
+target_height = 1080 #leave blank to let ffmpeg choose the best
+MOVIE_URL = "" # "https://straight.aebn.com/straight/movies/*"
+
 def modify_manifest(manifest_content, base_url, duration_seconds, target_height):
     # Namespace register
     prefix = 'mpd'
@@ -113,6 +116,4 @@ def main(MOVIE_URL):
 
 
 if __name__ == "__main__":
-    target_height = 1080 #leave blank to let ffmpeg choose the best
-    MOVIE_URL = "" # "https://straight.aebn.com/straight/movies/*"
     main(MOVIE_URL)
