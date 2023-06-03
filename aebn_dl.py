@@ -4,7 +4,6 @@ import sys
 import tempfile
 from urllib.parse import urljoin
 
-import ffmpeg
 import lxml.etree as ET
 from lxml import html
 
