@@ -52,11 +52,13 @@ def modify_manifest(manifest_content, base_url, duration_seconds, target_height)
         representations = adaptation_set.findall('mpd:Representation', namespaces=ns)
         for representation in representations:
             height = representation.get('height')
+            if height is None:
+                continue
             if target_height:
-                if height is not None and int(height) != target_height:
+                if int(height) != target_height:
                     adaptation_set.remove(representation)
             else:
-                if height is not None and int(height) > max_height:
+                if int(height) > max_height:
                     max_height = int(height)
 
     # Update startNumber attribute in SegmentTemplate elements to 1
