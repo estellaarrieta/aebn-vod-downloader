@@ -2,7 +2,6 @@ import datetime
 import pathlib
 import tempfile
 from urllib.parse import urljoin
-from xml.etree import ElementTree as ET
 
 import ffmpeg
 import lxml.etree as ET
