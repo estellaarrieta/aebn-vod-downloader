@@ -22,7 +22,7 @@ try:
     import ffmpeg
 except ModuleNotFoundError:
     print(
-        "You need to install the requests module. (https://pypi.org/project/ffmpeg-python/)"
+        "You need to install the ffmpeg-python module. (https://pypi.org/project/ffmpeg-python/)"
     )
     print(
         "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install ffmpeg-python"
