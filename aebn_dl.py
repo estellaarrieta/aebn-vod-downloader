@@ -1,13 +1,34 @@
 import datetime
 import pathlib
+import sys
 import tempfile
 from urllib.parse import urljoin
 
 import ffmpeg
 import lxml.etree as ET
-import requests
 from lxml import html
 
+try:
+    import requests
+except ModuleNotFoundError:
+    print(
+        "You need to install the requests module. (https://docs.python-requests.org/en/latest/user/install/)"
+    )
+    print(
+        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install requests"
+    )
+    sys.exit()
+
+try:
+    import ffmpeg
+except ModuleNotFoundError:
+    print(
+        "You need to install the requests module. (https://pypi.org/project/ffmpeg-python/)"
+    )
+    print(
+        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install ffmpeg-python"
+    )
+    sys.exit()
 
 target_height = 1080 #leave blank to let ffmpeg choose the best
 MOVIE_URL = "" # "https://straight.aebn.com/straight/movies/*"
