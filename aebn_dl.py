@@ -260,7 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("url", help="URL of the movie")
     parser.add_argument("--target_height", "--h", type=int, help="Target height of the video")
     parser.add_argument("--overwrite_existing_segmets", "--o",action="store_true", help="Overwrite existing segments")
-    parser.add_argument("--delete_segments_after_download", "--s",action="store_true", help="Don't delete segments after download")
+    parser.add_argument("--save_segments_after_download", "--s",action="store_true", help="Don't delete segments after download")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
