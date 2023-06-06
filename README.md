@@ -30,4 +30,4 @@ You can customize the behavior of the script by passing different arguments when
 - `--url`: The URL of the movie to download (required)
 - `--target-height`: The desired video resolution height (default: highest available)
 - `--overwrite-existing-segments`: Set this flag to overwrite existing video segments if present (default: False)
-- `--delete-segments-after-download`: Set this flag to delete segments after downloading (default: True)
+- `--delete-segments-after-download`: Set this flag to don't delete segments after downloading (default: True)
