@@ -40,10 +40,10 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, overwrite_existing_segmets=False, delete_segments_after_download = True):
+    def __init__(self, url, target_height=None, overwrite_existing_segmets=False, dont_delete_segments_after_download = False):
 
         self.movie_url = url
-        self.delete_segments_after_download = delete_segments_after_download
+        self.dont_delete_segments_after_download = dont_delete_segments_after_download
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.target_height = target_height
         self.stream_types = ["a", "v"]
@@ -57,7 +57,7 @@ class Movie:
         print("download complete")
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
-        if self.delete_segments_after_download:
+        if not self.dont_delete_segments_after_download:
             print("deleting segment folder...")
             self._temp_folder_cleanup()
             print("all done!")
@@ -227,7 +227,7 @@ class Movie:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
-                if self.delete_segments_after_download:
+                if self.dont_delete_segments_after_download:
                     os.remove(segment_file_path)
 
     def _join_segments(self):
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         url=args.url,
         target_height=args.target_height,
         overwrite_existing_segmets=args.overwrite_existing_segmets,
-        delete_segments_after_download=args.delete_segments_after_download,
+        dont_delete_segments_after_download=args.dont_delete_segments_after_download,
     )
     movie_instance.download()
     MOVIE_URL = sys.stdin.read()
