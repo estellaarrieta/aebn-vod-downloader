@@ -1,17 +1,26 @@
-import datetime
-import pathlib
+import argparse
+import math
+import os
+import shutil
 import sys
-import tempfile
-from urllib.parse import urljoin
 
-import lxml.etree as ET
-from lxml import html
+try:
+    import lxml.etree as ET
+    from lxml import html
+except ModuleNotFoundError:
+    print(
+        "You need to install the lxml module. (https://pypi.org/project/lxml/)"
+    )
+    print(
+        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install lxml"
+    )
+    sys.exit()
 
 try:
     import requests
 except ModuleNotFoundError:
     print(
-        "You need to install the requests module. (https://docs.python-requests.org/en/latest/user/install/)"
+        "You need to install the requests module. (https://pypi.org/project/requests/)"
     )
     print(
         "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install requests"
@@ -29,112 +38,236 @@ except ModuleNotFoundError:
     )
     sys.exit()
 
-target_height = 1080 #leave blank to let ffmpeg choose the best
-MOVIE_URL = "" # "https://straight.aebn.com/straight/movies/*"
 
-def modify_manifest(manifest_content, base_url, duration_seconds, target_height):
-    # Namespace register
-    prefix = 'mpd'
-    uri = 'urn:mpeg:dash:schema:mpd:2011'
-    ET.register_namespace(prefix, uri)
-    ns = {prefix: uri}
+class Movie:
+    def __init__(self, url, target_height=None, overwrite_existing_segmets=False, delete_segments_after_download = True):
 
-    # Parse the XML manifest
-    root = ET.fromstring(manifest_content)
+        self.movie_url = url
+        self.delete_segments_after_download = delete_segments_after_download
+        self.overwrite_existing_segmets = overwrite_existing_segmets
+        self.target_height = target_height
+        self.stream_types = ["a", "v"]
 
-    # Update the mediaPresentationDuration attribute
-    root.set('mediaPresentationDuration', f'PT{duration_seconds}S')
+    def download(self):
+        self._scrape_info()
+        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
+        self._download_segments()
+        # self._validate_segmets()
+        # asyncio.run(self._download_segments_a(10))
+        print("download complete")
+        self._join_segments()
+        self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
+        if self.delete_segments_after_download:
+            print("deleting segment folder...")
+            self._temp_folder_cleanup()
+            print("all done!")
 
-    # Remove streams that do not match the target height or get the larger height value
-    max_height = 0
-    adaptation_sets = root.findall('.//mpd:AdaptationSet', namespaces=ns)
-    for adaptation_set in adaptation_sets:
-        representations = adaptation_set.findall('mpd:Representation', namespaces=ns)
-        for representation in representations:
-            height = representation.get('height')
-            if height is None:
-                continue
-            if target_height:
-                if int(height) != target_height:
-                    adaptation_set.remove(representation)
-            else:
-                if int(height) > max_height:
-                    max_height = int(height)
+    def _scrape_info(self):
+        content = html.fromstring(requests.get(self.movie_url).content)
+        self.url_content_type = self.movie_url.split("/")[2].split(".")[0]
+        self.movie_id = self.movie_url.split("/")[5]
+        self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
+        self.movie_name = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
+        duration = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
+        self.duration_seconds = self._time_string_to_seconds(duration)
+        self._get_new_manifest_url()
+        self._get_manifest_content()
+        self._parse_manifest()
+        self.file_name = f"{self.studio_name} - {self.movie_name} {self.target_height}p"
+        print(self.file_name)
 
-    # Update startNumber attribute in SegmentTemplate elements to 1
-    # Update initialization and media paths to absolute URLs
-    segment_templates = root.findall('.//mpd:SegmentTemplate', namespaces=ns)
-    for template in segment_templates:
-        template.set('startNumber', '1')
 
-        initialization = template.get('initialization')
-        media = template.get('media')
+    def _time_string_to_seconds(self, time_string):
+        time_parts = list(map(int, time_string.split(':')))
+        time_parts.reverse()  # Reverse the list to start from seconds
+        total_seconds = 0
+        for i, part in enumerate(time_parts):
+            if i == 0:  # Seconds
+                total_seconds += part
+            elif i == 1:  # Minutes
+                total_seconds += part * 60
+            elif i == 2:  # Hours
+                total_seconds += part * 3600
+        return total_seconds
 
-        if initialization is not None:
-            template.set('initialization', urljoin(base_url, initialization))
+    def _get_manifest_content(self):
+        # Make HTTP request to get the manifest
+        response = requests.get(self.manifest_url)
+        response.raise_for_status()  # Raise an exception for non-2xx status codes
+        self.manifest_content = response.content
 
-        if media is not None:
-            template.set('media', urljoin(base_url, media))
+    def _get_new_manifest_url(self):
+        headers = {}
+        headers["content-type"] = "application/x-www-form-urlencoded"
+        data = f"movieId={self.movie_id}&isPreview=true&format=DASH"
+        content = requests.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
+        self.manifest_url = content["url"]
 
-    # Convert the modified XML back to a string
-    modified_manifest_content = ET.tostring(root, encoding='utf-8').decode('utf-8')
-    if max_height:
-        return modified_manifest_content, max_height
-    else:
-        return modified_manifest_content, target_height
+    def _get_best_video_stream_id(self, video_stream_elements):
+        # Find the video stream element with the highest height
+        highest_height = 0
+        highest_height_id = None
+        for element in video_stream_elements:
+            height = int(element.get('height'))
+            if height > highest_height:
+                highest_height = height
+                highest_height_id = element.get('id')
+        self.target_height = highest_height
+        self.video_stream_id = highest_height_id
 
-def download_media(modified_manifest_content, output_path):
-    # Create a temporary file to store the modified manifest
-    with tempfile.NamedTemporaryFile(suffix='.mpd', delete=False) as temp_manifest:
-        temp_manifest.write(modified_manifest_content.encode('utf-8'))
-        temp_manifest_path = pathlib.Path(temp_manifest.name)
+    def _parse_manifest(self):
+        # Parse the XML manifest
+        root = ET.fromstring(self.manifest_content)
+        self.number_of_segments = self._number_of_segments_calc(root, self.duration_seconds)
 
-    # Execute FFmpeg command
-    (
-        ffmpeg.input(str(temp_manifest_path), f='dash')
-        .output(str(output_path), codec='copy')
-        .run(overwrite_output=True)
-    )
+        self.audio_stream_id = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
 
-    # Remove the modified manifest file
-    temp_manifest_path.unlink()
+        if self.target_height:
+            self.video_stream_id = root.xpath(f'.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"and @height="{self.target_height}"]/@id')[0]
+            if not self.video_stream_id:
+                print(f"desired video resolution height {self.target_height} not found, aborting")
+                sys.exit()
+        else:
+            video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
+            self._get_best_video_stream_id(video_adaptation_sets)
 
-def movie_scrape(MOVIE_URL):
-    content = html.fromstring(requests.get(MOVIE_URL).content)
-    movie_id = MOVIE_URL.split("/")[5]
-    manifest_url = get_manifest_url(movie_id)
-    studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
-    movie_name = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
-    duration = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
-    time_obj = datetime.datetime.strptime(duration, "%H:%M:%S")
-    duration_seconds = time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-    name = f"{studio_name} - {movie_name}"
-    return name, duration_seconds, manifest_url
 
-def get_manifest_content(manifest_url):
-    # Make HTTP request to get the manifest
-    response = requests.get(manifest_url)
-    response.raise_for_status()  # Raise an exception for non-2xx status codes
-    return response.content
+    def _number_of_segments_calc(self, root, duration_seconds):
+        # Get timescale
+        timescale = float(root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@timescale')[0])
+        duration = float(root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@duration')[0])
+        # segment duration calc
+        segment_duration = duration / timescale
+        # number of segments calc
+        number_of_segments = duration_seconds / segment_duration
+        number_of_segments = math.ceil(number_of_segments)
+        return number_of_segments
 
-def get_manifest_url(movie_id):
-    headers = {}
-    headers["content-type"] = "application/x-www-form-urlencoded"
-    data = f"movieId={movie_id}&isPreview=true&format=DASH"
-    content = requests.post("https://straight.aebn.com/straight/deliver", headers=headers, data=data).json()
-    manifest_url = content["url"]
-    return manifest_url
+    def _temp_folder_cleanup(self):
+        shutil.rmtree(self.download_dir_path)
 
-def main(MOVIE_URL):
-    name, duration_seconds, manifest_url = movie_scrape(MOVIE_URL)
-    manifest_content = get_manifest_content(manifest_url)
-    base_url = manifest_url.rsplit('/', 1)[0]
-    modified_manifest_content, height = modify_manifest(manifest_content, base_url, duration_seconds, target_height)
-    name = f"{name} {height}p"
-    print(name)
-    output_path = pathlib.Path(f"{name}.mp4")
-    download_media(modified_manifest_content, output_path)
+
+    def _download_segments(self):
+        self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
+        max_segments = self.number_of_segments
+        session = requests.Session()
+        for stream_type in self.stream_types:
+            current_segment_number = 0
+            while current_segment_number <= max_segments:
+                if stream_type == "a":
+                    stream_id = self.audio_stream_id
+                else:
+                    stream_id = self.video_stream_id
+                if self._download_segment(session, stream_type, current_segment_number, stream_id):
+                    current_segment_number += 1
+                else:
+                    # segment download error, trying again with a new manifest
+                    self._get_new_manifest_url()
+                    self._get_manifest_content()
+                    self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
+                    if not self._download_segment(session, stream_type, current_segment_number, stream_id):
+                        sys.exit(f"{stream_type}_{current_segment_number} download error")
+
+
+    def _download_segment(self, session, segment_type, current_segment_number, stream_id):
+        if current_segment_number == 0:
+            segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
+        else:
+            segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
+        print(f"downloading segment {segment_type}_{current_segment_number}")
+        segment_file_name = f"{segment_type}_{current_segment_number}.mp4"
+        segment_path = os.path.join(self.download_dir_path, segment_file_name)
+        if os.path.exists(segment_path) and not self.overwrite_existing_segmets:
+            print(f"found {segment_file_name}")
+            return True
+        try:
+            response = session.get(segment_url)
+        except:
+            return False
+        if response.status_code == 404 and current_segment_number==self.number_of_segments:
+            # just skip if the last segment does not exists
+            # segment calc returns a rouded up float which sometimes bigger that the actual number of segments
+            return True
+        if response.status_code >= 403 or not response.content:
+            return False
+        if not os.path.exists(self.download_dir_path):
+            os.mkdir(self.download_dir_path)
+        with open(segment_path, 'wb') as f:
+            f.write(response.content)
+        return True
+
+
+    def _validate_segmets(self):
+        missing = []
+        for stream_type in self.stream_types:
+            segment_number = 0
+            while segment_number <= self.number_of_segments:
+                segment_file_name = f"{stream_type}_{segment_number}.mp4"
+                segment_path = os.path.join(self.download_dir_path, segment_file_name)
+                if not os.path.exists(segment_path):
+                    missing.append(segment_file_name)
+                segment_number+=1
+        if not missing:
+            return True
+        return missing
+
+
+    def _ffmpeg_mux_video_audio(self, video_path, audio_path):
+        input_video = ffmpeg.input(video_path)
+        input_audio = ffmpeg.input(audio_path)
+        output_file = f"{self.file_name}.mp4"
+
+        output = ffmpeg.output(input_video, input_audio, output_file, shortest=None, codec='copy')
+        output.run()
+
+    def _join_files(self, files, output_path):
+        with open(output_path, 'wb') as f:
+            for segment_file_path in files:
+                with open(segment_file_path, 'rb') as segment_file:
+                    content = segment_file.read()
+                    segment_file.close()
+                    f.write(content)
+                if self.delete_segments_after_download:
+                    os.remove(segment_file_path)
+
+    def _join_segments(self):
+        print("joining files...")
+        self.audio_stream_path = os.path.join(self.download_dir_path, "a_" + self.movie_id + ".mp4")
+        self.video_stream_path = os.path.join(self.download_dir_path, "v_" + self.movie_id + ".mp4")
+        # delete old joined streams if found
+        if os.path.exists(self.audio_stream_path):
+            os.remove(self.audio_stream_path)
+        if os.path.exists(self.video_stream_path):
+            os.remove(self.video_stream_path)
+
+        # Create a list of video and audio files
+        video_files = [os.path.join(self.download_dir_path, file) for file in os.listdir(self.download_dir_path)
+                    if file.startswith('v_')]
+        audio_files = [os.path.join(self.download_dir_path, file) for file in os.listdir(self.download_dir_path)
+                    if file.startswith('a_')]
+        video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+        audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+
+        # concat all audio segment data into a single file
+        self._join_files(audio_files, self.audio_stream_path)
+        
+        # concat all video segment data into a single file
+        self._join_files(video_files, self.video_stream_path)
 
 
 if __name__ == "__main__":
-    main(MOVIE_URL)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url", help="URL of the movie")
+    parser.add_argument("--target_height", "--h", type=int, help="Target height of the video")
+    parser.add_argument("--overwrite_existing_segmets", "--o",action="store_true", help="Overwrite existing segments")
+    parser.add_argument("--delete_segments_after_download", "--s",action="store_true", help="Don't delete segments after download")
+    args = parser.parse_args()
+    movie_instance = Movie(
+        url=args.url,
+        target_height=args.target_height,
+        overwrite_existing_segmets=args.overwrite_existing_segmets,
+        delete_segments_after_download=args.delete_segments_after_download,
+    )
+    movie_instance.download()
+    MOVIE_URL = sys.stdin.read()
+    Movie(MOVIE_URL).download()
