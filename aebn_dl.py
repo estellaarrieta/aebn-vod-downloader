@@ -264,9 +264,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
-        target_height=args.target_height,
-        overwrite_existing_segmets=args.overwrite_existing_segmets,
-        dont_delete_segments_after_download=args.dont_delete_segments_after_download,
+        target_height=args.h,
+        overwrite_existing_segmets=args.o,
+        dont_delete_segments_after_download=args.s,
     )
     movie_instance.download()
     MOVIE_URL = sys.stdin.read()
