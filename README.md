@@ -1,8 +1,7 @@
 # Download from AEBN for *FREE*
 
-### This Python script allows you to download full movies from aebn.com without even having an account, all you need is a URL!
-It works by parsing a preview playlist to get segment's urls, downloads them, and uses ffmpeg to mux video and audio.
-Those preview playlist do not live for long, so if download fais, script will get a new one and try again.
+### This Python script allows you to download full movies from aebn.com without even having an account, all you need is a URL!  
+Works by parsing a preview playlist to get full movie segment's urls, downloads them, and uses ffmpeg to mux video and audio.
 
 It requires the following modules to be installed:
 
