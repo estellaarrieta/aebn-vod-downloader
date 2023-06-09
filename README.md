@@ -5,16 +5,17 @@ Works by parsing a preview playlist to get full movie segment's urls, downloads 
 
 It requires the following modules to be installed:
 
+
+- ffmpeg (provide directory as a prameter or add to PATH)
 - lxml (https://pypi.org/project/lxml/)
 - requests (https://pypi.org/project/requests/)
-- ffmpeg-python (https://pypi.org/project/ffmpeg-python/)
 
 ## Usage
 
 1. Install the required modules using pip:
 
 ```
-pip install requests lxml ffmpeg-python
+pip install requests lxml
 ```
 2. Run the script with the desired movie URL:
 ```
