@@ -2,6 +2,7 @@ import argparse
 import math
 import os
 import shutil
+import subprocess
 import sys
 
 try:
@@ -27,40 +28,45 @@ except ModuleNotFoundError:
     )
     sys.exit()
 
-try:
-    import ffmpeg
-except ModuleNotFoundError:
-    print(
-        "You need to install the ffmpeg-python module. (https://pypi.org/project/ffmpeg-python/)"
-    )
-    print(
-        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install ffmpeg-python"
-    )
-    sys.exit()
-
 
 class Movie:
-    def __init__(self, url, target_height=None, overwrite_existing_segmets=False, dont_delete_segments_after_download = False):
+    def __init__(self, url, target_height=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download = False):
 
         self.movie_url = url
+        self.ffmpeg_dir = ffmpeg_dir
         self.dont_delete_segments_after_download = dont_delete_segments_after_download
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.target_height = target_height
         self.stream_types = ["a", "v"]
 
+    def _construct_paths(self):
+        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
+        self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
+        self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
+
     def download(self):
         self._scrape_info()
-        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
+        self._ffmpeg_check()
+        self._construct_paths()
+        if self._handle_existing_files():
+            return
         self._download_segments()
-        # self._validate_segmets()
-        # asyncio.run(self._download_segments_a(10))
         print("download complete")
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
         if not self.dont_delete_segments_after_download:
-            print("deleting segment folder...")
             self._temp_folder_cleanup()
             print("all done!")
+
+    def _handle_existing_files(self):
+        if os.path.exists(self.audio_stream_path) and os.path.exists(self.video_stream_path):
+            if input('downloaded parts found! try to mux with ffmpeg? (y/n): ').lower().strip() == 'y':
+                self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
+                if not self.dont_delete_segments_after_download:
+                    self._temp_folder_cleanup()
+                    print("all done!")
+                return True
+        return False
 
     def _scrape_info(self):
         content = html.fromstring(requests.get(self.movie_url).content)
@@ -75,6 +81,11 @@ class Movie:
         self._parse_manifest()
         self.file_name = f"{self.studio_name} - {self.movie_name} {self.target_height}p"
         print(self.file_name)
+
+    def _ffmpeg_check(self):
+        ffmpeg_exe = lambda x: shutil.which("ffmpeg") is not None
+        if not ffmpeg_exe and self.ffmpeg_dir is None:
+            sys.exit("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
 
 
     def _time_string_to_seconds(self, time_string):
@@ -103,7 +114,7 @@ class Movie:
         content = requests.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
         self.manifest_url = content["url"]
 
-    def _get_best_video_stream_id(self, video_stream_elements):
+    def _get_best_video_stream(self, video_stream_elements):
         # Find the video stream element with the highest height
         highest_height = 0
         highest_height_id = None
@@ -129,7 +140,7 @@ class Movie:
                 sys.exit()
         else:
             video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
-            self._get_best_video_stream_id(video_adaptation_sets)
+            self._get_best_video_stream(video_adaptation_sets)
 
 
     def _number_of_segments_calc(self, root, duration_seconds):
@@ -144,6 +155,7 @@ class Movie:
         return number_of_segments
 
     def _temp_folder_cleanup(self):
+        print("deleting segment folder...")
         shutil.rmtree(self.download_dir_path)
 
 
@@ -167,7 +179,6 @@ class Movie:
                     self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
                     if not self._download_segment(session, stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{current_segment_number} download error")
-
 
     def _download_segment(self, session, segment_type, current_segment_number, stream_id):
         if current_segment_number == 0:
@@ -196,29 +207,15 @@ class Movie:
             f.write(response.content)
         return True
 
-
-    def _validate_segmets(self):
-        missing = []
-        for stream_type in self.stream_types:
-            segment_number = 0
-            while segment_number <= self.number_of_segments:
-                segment_file_name = f"{stream_type}_{segment_number}.mp4"
-                segment_path = os.path.join(self.download_dir_path, segment_file_name)
-                if not os.path.exists(segment_path):
-                    missing.append(segment_file_name)
-                segment_number+=1
-        if not missing:
-            return True
-        return missing
-
-
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
-        input_video = ffmpeg.input(video_path)
-        input_audio = ffmpeg.input(audio_path)
         output_file = f"{self.file_name}.mp4"
-
-        output = ffmpeg.output(input_video, input_audio, output_file, shortest=None, codec='copy')
-        output.run()
+        output_path = os.path.join(os.getcwd(), output_file)
+        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}"'
+        if self.ffmpeg_dir:
+            out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
+        else:
+            out = subprocess.run(cmd, shell=True)
+        assert out.returncode == 0
 
     def _join_files(self, files, output_path):
         with open(output_path, 'wb') as f:
@@ -232,8 +229,6 @@ class Movie:
 
     def _join_segments(self):
         print("joining files...")
-        self.audio_stream_path = os.path.join(self.download_dir_path, "a_" + self.movie_id + ".mp4")
-        self.video_stream_path = os.path.join(self.download_dir_path, "v_" + self.movie_id + ".mp4")
         # delete old joined streams if found
         if os.path.exists(self.audio_stream_path):
             os.remove(self.audio_stream_path)
@@ -258,16 +253,16 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("--h", type=int, help="Target height of the video")
-    parser.add_argument("--o",action="store_true", help="Overwrite existing segments")
-    parser.add_argument("--s",action="store_true", help="Don't delete segments after download")
+    parser.add_argument("--h", type=int, help="Target height of the video (optional)")
+    parser.add_argument("--f", type=str, help="ffmpeg directory (optional)")
+    parser.add_argument("--o",action="store_true", help="Overwrite existing segments (optional)")
+    parser.add_argument("--s",action="store_true", help="Don't delete segments after download (optional)")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
+        ffmpeg_dir = args.f,
         target_height=args.h,
         overwrite_existing_segmets=args.o,
         dont_delete_segments_after_download=args.s,
     )
     movie_instance.download()
-    MOVIE_URL = sys.stdin.read()
-    Movie(MOVIE_URL).download()
