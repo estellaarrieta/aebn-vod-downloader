@@ -3,8 +3,7 @@
 ### This Python script allows you to download full movies from aebn.com without even having an account, all you need is a URL!  
 Works by parsing a preview playlist to get full movie segment's urls, downloads them, and uses ffmpeg to mux video and audio.
 
-It requires the following modules to be installed:
-
+Dependencies:
 
 - ffmpeg (provide directory as a prameter or add to PATH)
 - lxml (https://pypi.org/project/lxml/)
