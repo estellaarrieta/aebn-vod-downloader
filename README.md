@@ -30,5 +30,7 @@ You can customize the behavior of the script by passing different arguments when
 - `url`: The URL of the movie to download (required)
 - `--h`: The desired video resolution height (default: highest available)
 - `--f`: FFmpeg directory (default: try to use PATH)
+- `--start`: Specify start segment (default: 1)
+- `--end`: Specify end segment (default: total avaliable)
 - `--o`: Set this flag to overwrite existing video segments if present (default: False)
 - `--s`: Set this flag to don't delete segments after downloading (default: False)
