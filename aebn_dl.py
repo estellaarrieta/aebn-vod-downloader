@@ -167,14 +167,20 @@ class Movie:
 
     def _download_segments(self):
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
-        max_segments = self.end_segment
+        if self.end_segment:
+            max_segments = self.end_segment
+        else:
+            max_segments = self.number_of_segments
         session = requests.Session()
         for stream_type in self.stream_types:
             if stream_type == "a":
                 stream_id = self.audio_stream_id
             else:
                 stream_id = self.video_stream_id
-            current_segment_number = self.start_segment
+            if self.start_segment:
+                current_segment_number = self.start_segment
+            else:
+                current_segment_number = 1
             self._download_segment(session, stream_type, 0, stream_id)
             while current_segment_number <= max_segments:
                 if self._download_segment(session, stream_type, current_segment_number, stream_id):
