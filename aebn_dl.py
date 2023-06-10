@@ -224,7 +224,7 @@ class Movie:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
-                if self.dont_delete_segments_after_download:
+                if not self.dont_delete_segments_after_download:
                     os.remove(segment_file_path)
 
     def _join_segments(self):
