@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment = None, end_segment = None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False, use_async=True):
+    def __init__(self, url, target_height=None, start_segment = None, end_segment = None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -53,9 +53,6 @@ class Movie:
         self._construct_paths()
         if self._handle_existing_files():
             return
-        # if self.use_async:
-        #     self._download_segments_async()
-        # else:
         self._download_segments()
         print("download complete")
         self._join_segments()
@@ -73,6 +70,12 @@ class Movie:
                     print("all done!")
                 return True
         return False
+    
+    def _remove_chars(self, text):
+        for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
+            if ch in text:
+                text = text.replace(ch,'')
+        return text
 
     def _scrape_info(self):
         content = html.fromstring(requests.get(self.movie_url).content)
@@ -86,6 +89,7 @@ class Movie:
         self._get_manifest_content()
         self._parse_manifest()
         self.file_name = f"{self.studio_name} - {self.movie_name} {self.target_height}p"
+        self.file_name  = self._remove_chars(self.file_name)
         print(self.file_name)
 
     def _ffmpeg_check(self):
