@@ -39,7 +39,6 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.dont_delete_segments_after_download = dont_delete_segments_after_download
-        self.use_async = use_async
         self.stream_types = ["a", "v"]
 
     def _construct_paths(self):
