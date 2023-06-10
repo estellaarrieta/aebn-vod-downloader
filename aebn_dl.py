@@ -30,13 +30,16 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download = False):
+    def __init__(self, url, target_height=None, start_segment = None, end_segment = None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False, use_async=True):
 
         self.movie_url = url
-        self.ffmpeg_dir = ffmpeg_dir
-        self.dont_delete_segments_after_download = dont_delete_segments_after_download
-        self.overwrite_existing_segmets = overwrite_existing_segmets
         self.target_height = target_height
+        self.start_segment = start_segment
+        self.end_segment = end_segment
+        self.ffmpeg_dir = ffmpeg_dir
+        self.overwrite_existing_segmets = overwrite_existing_segmets
+        self.dont_delete_segments_after_download = dont_delete_segments_after_download
+        self.use_async = use_async
         self.stream_types = ["a", "v"]
 
     def _construct_paths(self):
@@ -50,6 +53,9 @@ class Movie:
         self._construct_paths()
         if self._handle_existing_files():
             return
+        # if self.use_async:
+        #     self._download_segments_async()
+        # else:
         self._download_segments()
         print("download complete")
         self._join_segments()
@@ -83,7 +89,7 @@ class Movie:
         print(self.file_name)
 
     def _ffmpeg_check(self):
-        ffmpeg_exe = lambda x: shutil.which("ffmpeg") is not None
+        ffmpeg_exe = shutil.which("ffmpeg") is not None
         if not ffmpeg_exe and self.ffmpeg_dir is None:
             sys.exit("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
 
@@ -152,24 +158,25 @@ class Movie:
         # number of segments calc
         number_of_segments = duration_seconds / segment_duration
         number_of_segments = math.ceil(number_of_segments)
+        print(f"totlal segments: {number_of_segments}")
         return number_of_segments
 
     def _temp_folder_cleanup(self):
         print("deleting segment folder...")
         shutil.rmtree(self.download_dir_path)
 
-
     def _download_segments(self):
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
-        max_segments = self.number_of_segments
+        max_segments = self.end_segment
         session = requests.Session()
         for stream_type in self.stream_types:
-            current_segment_number = 0
+            if stream_type == "a":
+                stream_id = self.audio_stream_id
+            else:
+                stream_id = self.video_stream_id
+            current_segment_number = self.start_segment
+            self._download_segment(session, stream_type, 0, stream_id)
             while current_segment_number <= max_segments:
-                if stream_type == "a":
-                    stream_id = self.audio_stream_id
-                else:
-                    stream_id = self.video_stream_id
                 if self._download_segment(session, stream_type, current_segment_number, stream_id):
                     current_segment_number += 1
                 else:
@@ -253,8 +260,10 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("--h", type=int, help="Target height of the video (optional)")
+    parser.add_argument("--h", type=int, help="Target video resolution height (optional)")
     parser.add_argument("--f", type=str, help="ffmpeg directory (optional)")
+    parser.add_argument("--start", type=int, help="specify start segment (optional)")
+    parser.add_argument("--end", type=int, help="specify end segment (optional)")
     parser.add_argument("--o",action="store_true", help="Overwrite existing segments (optional)")
     parser.add_argument("--s",action="store_true", help="Don't delete segments after download (optional)")
     args = parser.parse_args()
@@ -262,6 +271,8 @@ if __name__ == "__main__":
         url=args.url,
         ffmpeg_dir = args.f,
         target_height=args.h,
+        start_segment=args.start,
+        end_segment=args.end,
         overwrite_existing_segmets=args.o,
         dont_delete_segments_after_download=args.s,
     )
