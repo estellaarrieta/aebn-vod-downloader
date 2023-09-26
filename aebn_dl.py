@@ -152,7 +152,7 @@ class Movie:
 
     def _parse_manifest(self):
         # Parse the XML manifest
-        root = ET.fromstring(self.manifest_content)
+        root = ET.fromstring(self.manifest_content, None)
         self.number_of_segments = self._number_of_segments_calc(root, self.duration_seconds)
 
         self.audio_stream_id = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
