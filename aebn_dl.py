@@ -32,6 +32,8 @@ except ModuleNotFoundError:
     )
     sys.exit()
 
+# Get the ANSI codes working on Windows cmd prompt
+os.system('')
 
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False, download_covers=False):
@@ -176,7 +178,7 @@ class Movie:
         # number of segments calc
         number_of_segments = duration_seconds / segment_duration
         number_of_segments = math.ceil(number_of_segments)
-        print(f"totlal segments: {number_of_segments}")
+        print(f"total segments: {number_of_segments}")
         return number_of_segments
 
     def _temp_folder_cleanup(self):
@@ -216,11 +218,14 @@ class Movie:
             segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
         else:
             segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
-        print(f"downloading segment {segment_type}_{current_segment_number}")
+        # print(f"downloading segment {segment_type}_{current_segment_number}")
+        progress_percentage = f"{current_segment_number/self.number_of_segments:.1%}" # 1 decimal
+        sys.stdout.write(f"\033[Kdownloading segment {segment_type}_{current_segment_number} {progress_percentage}\r")
         segment_file_name = f"{segment_type}_{current_segment_number}.mp4"
         segment_path = os.path.join(self.download_dir_path, segment_file_name)
         if os.path.exists(segment_path) and not self.overwrite_existing_segmets:
-            print(f"found {segment_file_name}")
+            # print(f"found {segment_file_name}")
+            sys.stdout.write(f"found {segment_file_name}\r") # note, this happens fast, might be hard to spot if debugging
             return True
         try:
             response = session.get(segment_url)
