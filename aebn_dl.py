@@ -66,17 +66,18 @@ class Movie:
             self.download_dir_path, f"v_{self.movie_id}.mp4")
 
     def download(self):
+        print(f"Input URL: {self.movie_url}")
         self._scrape_info()
         self._ffmpeg_check()
         self._construct_paths()
         self._download_segments()
-        print("download complete")
+        print("Download complete")
         self._join_segments()
         self._ffmpeg_mux_video_audio(
             self.video_stream_path, self.audio_stream_path)
         if not self.keep_segments_after_download:
             self._temp_folder_cleanup()
-            print("all done!")
+        print("All done!")
 
     def _remove_chars(self, text):
         for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
