@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
 import argparse
+import datetime
 import math
 import os
 import shutil
 import subprocess
 import sys
+import time
+import email.utils as eut
 
 try:
     import lxml.etree as ET
@@ -28,9 +32,11 @@ except ModuleNotFoundError:
     )
     sys.exit()
 
+# Get the ANSI codes working on Windows cmd prompt
+os.system('')
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment = None, end_segment = None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False, download_covers=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -39,6 +45,7 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.dont_delete_segments_after_download = dont_delete_segments_after_download
+        self.download_covers = download_covers
         self.stream_types = ["a", "v"]
 
     def _construct_paths(self):
@@ -69,11 +76,11 @@ class Movie:
                     print("all done!")
                 return True
         return False
-    
+
     def _remove_chars(self, text):
         for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
             if ch in text:
-                text = text.replace(ch,'')
+                text = text.replace(ch, '')
         return text
 
     def _scrape_info(self):
@@ -88,14 +95,25 @@ class Movie:
         self._get_manifest_content()
         self._parse_manifest()
         self.file_name = f"{self.studio_name} - {self.movie_name} {self.target_height}p"
-        self.file_name  = self._remove_chars(self.file_name)
+        self.file_name = self._remove_chars(self.file_name)
+
+        if self.download_covers:
+            try:
+                self.cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
+                self.cover_front = 'https:' + self.cover_front.split("?")[0]
+                self.cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
+                self.cover_back = 'https:' + self.cover_back.split("?")[0]
+                self._get_covers(self.cover_front, 'cover-a')
+                self._get_covers(self.cover_back, 'cover-b')
+            except Exception as e:
+                print("Error fetching cover urls: ", e)
+
         print(self.file_name)
 
     def _ffmpeg_check(self):
         ffmpeg_exe = shutil.which("ffmpeg") is not None
         if not ffmpeg_exe and self.ffmpeg_dir is None:
             sys.exit("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
-
 
     def _time_string_to_seconds(self, time_string):
         time_parts = list(map(int, time_string.split(':')))
@@ -137,7 +155,7 @@ class Movie:
 
     def _parse_manifest(self):
         # Parse the XML manifest
-        root = ET.fromstring(self.manifest_content)
+        root = ET.fromstring(self.manifest_content, None)
         self.number_of_segments = self._number_of_segments_calc(root, self.duration_seconds)
 
         self.audio_stream_id = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
@@ -151,7 +169,6 @@ class Movie:
             video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
             self._get_best_video_stream(video_adaptation_sets)
 
-
     def _number_of_segments_calc(self, root, duration_seconds):
         # Get timescale
         timescale = float(root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@timescale')[0])
@@ -161,7 +178,7 @@ class Movie:
         # number of segments calc
         number_of_segments = duration_seconds / segment_duration
         number_of_segments = math.ceil(number_of_segments)
-        print(f"totlal segments: {number_of_segments}")
+        print(f"total segments: {number_of_segments}")
         return number_of_segments
 
     def _temp_folder_cleanup(self):
@@ -201,17 +218,20 @@ class Movie:
             segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
         else:
             segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
-        print(f"downloading segment {segment_type}_{current_segment_number}")
+        # print(f"downloading segment {segment_type}_{current_segment_number}")
+        progress_percentage = f"{current_segment_number/self.number_of_segments:.1%}" # 1 decimal
+        sys.stdout.write(f"\033[Kdownloading segment {segment_type}_{current_segment_number} {progress_percentage}\r")
         segment_file_name = f"{segment_type}_{current_segment_number}.mp4"
         segment_path = os.path.join(self.download_dir_path, segment_file_name)
         if os.path.exists(segment_path) and not self.overwrite_existing_segmets:
-            print(f"found {segment_file_name}")
+            # print(f"found {segment_file_name}")
+            sys.stdout.write(f"found {segment_file_name}\r") # note, this happens fast, might be hard to spot if debugging
             return True
         try:
             response = session.get(segment_url)
         except:
             return False
-        if response.status_code == 404 and current_segment_number==self.number_of_segments:
+        if response.status_code == 404 and current_segment_number == self.number_of_segments:
             # just skip if the last segment does not exists
             # segment calc returns a rouded up float which sometimes bigger that the actual number of segments
             return True
@@ -253,17 +273,34 @@ class Movie:
 
         # Create a list of video and audio files
         video_files = [os.path.join(self.download_dir_path, file) for file in os.listdir(self.download_dir_path)
-                    if file.startswith('v_')]
+                       if file.startswith('v_')]
         audio_files = [os.path.join(self.download_dir_path, file) for file in os.listdir(self.download_dir_path)
-                    if file.startswith('a_')]
+                       if file.startswith('a_')]
         video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
         audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
 
         # concat all audio segment data into a single file
         self._join_files(audio_files, self.audio_stream_path)
-        
+
         # concat all video segment data into a single file
         self._join_files(video_files, self.video_stream_path)
+
+    def _get_covers(self, cover_url, cover_name):
+        cover_extension = os.path.splitext(cover_url)[1]
+        output = f'{self.file_name} {cover_name}{cover_extension}'
+
+        # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
+        r = requests.get(cover_url)
+        f = open(output, "wb")
+        f.write(r.content)
+        f.close()
+        last_modified = r.headers["last-modified"]
+        modified = time.mktime(datetime.datetime(*eut.parsedate(last_modified)[:6]).timetuple())  # type: ignore
+        now = time.mktime(datetime.datetime.today().timetuple())
+        os.utime(output, (now, modified))
+
+        if os.path.isfile(output):
+            print("Saved cover:", output)
 
 
 if __name__ == "__main__":
@@ -273,16 +310,18 @@ if __name__ == "__main__":
     parser.add_argument("--f", type=str, help="ffmpeg directory (optional)")
     parser.add_argument("--start", type=int, help="specify start segment (optional)")
     parser.add_argument("--end", type=int, help="specify end segment (optional)")
-    parser.add_argument("--o",action="store_true", help="Overwrite existing segments (optional)")
-    parser.add_argument("--s",action="store_true", help="Don't delete segments after download (optional)")
+    parser.add_argument("--o", action="store_true", help="Overwrite existing segments (optional)")
+    parser.add_argument("--s", action="store_true", help="Don't delete segments after download (optional)")
+    parser.add_argument("--c", action="store_true", help="Download covers (optional)")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
-        ffmpeg_dir = args.f,
+        ffmpeg_dir=args.f,
         target_height=args.h,
         start_segment=args.start,
         end_segment=args.end,
         overwrite_existing_segmets=args.o,
         dont_delete_segments_after_download=args.s,
+        download_covers=args.c
     )
     movie_instance.download()
