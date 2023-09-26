@@ -101,8 +101,8 @@ class Movie:
                 self.cover_front = 'https:' + self.cover_front.split("?")[0]
                 self.cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
                 self.cover_back = 'https:' + self.cover_back.split("?")[0]
-                self._get_covers(self.cover_front)
-                self._get_covers(self.cover_back)
+                self._get_covers(self.cover_front, 'cover-a')
+                self._get_covers(self.cover_back, 'cover-b')
             except Exception as e:
                 print("Error fetching cover urls: ", e)
 
@@ -280,8 +280,9 @@ class Movie:
         # concat all video segment data into a single file
         self._join_files(video_files, self.video_stream_path)
 
-    def _get_covers(self, cover_url):
-        output = f'{self.file_name} {os.path.basename(cover_url)}'
+    def _get_covers(self, cover_url, cover_name):
+        cover_extension = os.path.splitext(cover_url)[1]
+        output = f'{self.file_name} {cover_name}{cover_extension}'
 
         # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
         r = requests.get(cover_url)
