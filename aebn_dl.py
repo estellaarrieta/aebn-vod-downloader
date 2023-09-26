@@ -1,9 +1,12 @@
 import argparse
+import datetime
 import math
 import os
 import shutil
 import subprocess
 import sys
+import time
+import email.utils as eut
 
 try:
     import lxml.etree as ET
@@ -30,7 +33,7 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, overwrite_existing_segmets=False, dont_delete_segments_after_download=False, download_covers=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -39,6 +42,7 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.dont_delete_segments_after_download = dont_delete_segments_after_download
+        self.download_covers = download_covers
         self.stream_types = ["a", "v"]
 
     def _construct_paths(self):
@@ -89,6 +93,18 @@ class Movie:
         self._parse_manifest()
         self.file_name = f"{self.studio_name} - {self.movie_name} {self.target_height}p"
         self.file_name = self._remove_chars(self.file_name)
+
+        if self.download_covers:
+            try:
+                self.cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
+                self.cover_front = 'https:' + self.cover_front.split("?")[0]
+                self.cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
+                self.cover_back = 'https:' + self.cover_back.split("?")[0]
+                self._get_covers(self.cover_front)
+                self._get_covers(self.cover_back)
+            except Exception as e:
+                print("Error fetching cover urls: ", e)
+
         print(self.file_name)
 
     def _ffmpeg_check(self):
@@ -263,6 +279,22 @@ class Movie:
         # concat all video segment data into a single file
         self._join_files(video_files, self.video_stream_path)
 
+    def _get_covers(self, cover_url):
+        output = f'{self.file_name} {os.path.basename(cover_url)}'
+
+        # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
+        r = requests.get(cover_url)
+        f = open(output, "wb")
+        f.write(r.content)
+        f.close()
+        last_modified = r.headers["last-modified"]
+        modified = time.mktime(datetime.datetime(*eut.parsedate(last_modified)[:6]).timetuple())  # type: ignore
+        now = time.mktime(datetime.datetime.today().timetuple())
+        os.utime(output, (now, modified))
+
+        if os.path.isfile(output):
+            print("Saved cover:", output)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -273,6 +305,7 @@ if __name__ == "__main__":
     parser.add_argument("--end", type=int, help="specify end segment (optional)")
     parser.add_argument("--o", action="store_true", help="Overwrite existing segments (optional)")
     parser.add_argument("--s", action="store_true", help="Don't delete segments after download (optional)")
+    parser.add_argument("--c", action="store_true", help="Download covers (optional)")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
@@ -282,5 +315,6 @@ if __name__ == "__main__":
         end_segment=args.end,
         overwrite_existing_segmets=args.o,
         dont_delete_segments_after_download=args.s,
+        download_covers=args.c
     )
     movie_instance.download()
