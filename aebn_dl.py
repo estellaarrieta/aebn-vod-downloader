@@ -33,7 +33,8 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
+                 download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False, target_download_dir=None):
 
         self.movie_url = url
         self.target_height = target_height
@@ -44,15 +45,24 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.keep_segments_after_download = keep_segments_after_download
+        self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
 
     def _construct_paths(self):
-        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
+        if self.target_download_dir:
+            target_working_dir = self.target_download_dir
+            if not os.path.exists(target_working_dir):
+                os.makedirs(target_working_dir)
+        else:
+            target_working_dir = os.getcwd()
+
+        self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
         self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
         self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
+        print(f"Saving to: {self.target_download_dir}")
         self._scrape_info()
         self._ffmpeg_check()
         self._construct_paths()
@@ -345,6 +355,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
+    parser.add_argument("-t", "--target_dir", type=str, help="Specify a target download directory")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
@@ -356,5 +367,6 @@ if __name__ == "__main__":
         download_covers=args.covers,
         overwrite_existing_segmets=args.overwrite,
         keep_segments_after_download=args.keep,
+        target_download_dir=args.target_dir
     )
     movie_instance.download()

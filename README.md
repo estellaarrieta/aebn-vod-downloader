@@ -42,3 +42,4 @@ You can customize the behavior of the script by passing different arguments when
 |`-c, --covers`|Download covers|
 |`-o, --overwrite`|Overwrite existing segments on the disk|
 |`-k, --keep`|Keep segments after download|
+|`-t, --target_dir TARGET_DIR`|Specify a target download directory|
