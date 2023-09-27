@@ -39,3 +39,4 @@ You can customize the behavior of the script by passing different arguments when
 - `-c`: Set this flag to download the front and back covers (default: False)
 - `-o`: Set this flag to overwrite existing video segments if present (default: False)
 - `-k`: Set this flag to don't delete segments after downloading (default: False)
+- `-h`, `--help`: Show the above information in the terminal
