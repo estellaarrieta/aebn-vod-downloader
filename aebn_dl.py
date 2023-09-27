@@ -195,11 +195,10 @@ class Movie:
         # Parse the XML manifest
         root = ET.fromstring(self.manifest_content, None)
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
-
-        self.audio_stream_id = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams(video_adaptation_sets)
         print("Avaliable video streams:")
+        self.audio_stream_id, _ = video_streams[-1]
         for video_stream in video_streams:
             print(video_stream[1])
         if self.target_height == 0:
