@@ -201,7 +201,7 @@ class Movie:
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams(video_adaptation_sets)
-        print("Avaliable video streams:")
+        print("Available video streams:")
         self.audio_stream_id, _ = video_streams[-1]
         for video_stream in video_streams:
             print(video_stream[1])
