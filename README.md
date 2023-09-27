@@ -20,7 +20,10 @@ pip install requests lxml
 ```
 python aebn_dl.py https://*.aebn.com/*/movies/*
 ```
-
+On some Linux distrubtions you may have to run the following instead:
+```
+python3 aebn_dl.py https://*.aebn.com/*/movies/*
+```
 3. The script will download the movie and save it in the current working directory.
 
 ## Running the Script with Different Arguments
@@ -28,10 +31,11 @@ python aebn_dl.py https://*.aebn.com/*/movies/*
 You can customize the behavior of the script by passing different arguments when running it. The available arguments are:
 
 - `url`: The URL of the movie to download (required)
-- `--h`: The desired video resolution height (default: highest available)
-- `--f`: FFmpeg directory (default: try to use PATH)
-- `--start`: Specify start segment (default: 1)
-- `--end`: Specify end segment (default: total available)
-- `--o`: Set this flag to overwrite existing video segments if present (default: False)
-- `--s`: Set this flag to don't delete segments after downloading (default: False)
-- `--c`: Set this flag to download the front and back covers (default: False)
+- `-r`: The desired video resolution height (default: highest available)
+- `-f`: FFmpeg directory (default: try to use PATH)
+- `-sn`: Specify which scene to download (default: disabled)
+- `-start`: Specify start segment (default: 1)
+- `-end`: Specify end segment (default: total available)
+- `-c`: Set this flag to download the front and back covers (default: False)
+- `-o`: Set this flag to overwrite existing video segments if present (default: False)
+- `-k`: Set this flag to don't delete segments after downloading (default: False)
