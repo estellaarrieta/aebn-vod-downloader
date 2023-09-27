@@ -12,35 +12,23 @@ import time
 try:
     from tqdm import tqdm
 except ModuleNotFoundError:
-    print(
-        "You need to install the lxml module. (https://pypi.org/project/tqdm/)"
-    )
-    print(
-        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install tqdm"
-    )
+    print("You need to install the lxml module. (https://pypi.org/project/tqdm/)")
+    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install tqdm")
     sys.exit()
 
 try:
     import lxml.etree as ET
     from lxml import html
 except ModuleNotFoundError:
-    print(
-        "You need to install the lxml module. (https://pypi.org/project/lxml/)"
-    )
-    print(
-        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install lxml"
-    )
+    print("You need to install the lxml module. (https://pypi.org/project/lxml/)")
+    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install lxml")
     sys.exit()
 
 try:
     import requests
 except ModuleNotFoundError:
-    print(
-        "You need to install the requests module. (https://pypi.org/project/requests/)"
-    )
-    print(
-        "If you have pip (normally installed with python), run this command in a terminal (cmd): pip install requests"
-    )
+    print("You need to install the requests module. (https://pypi.org/project/requests/)")
+    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install requests")
     sys.exit()
 
 
@@ -60,10 +48,8 @@ class Movie:
 
     def _construct_paths(self):
         self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
-        self.audio_stream_path = os.path.join(
-            self.download_dir_path, f"a_{self.movie_id}.mp4")
-        self.video_stream_path = os.path.join(
-            self.download_dir_path, f"v_{self.movie_id}.mp4")
+        self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
+        self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
@@ -73,8 +59,7 @@ class Movie:
         self._download_segments()
         print("Download complete")
         self._join_segments()
-        self._ffmpeg_mux_video_audio(
-            self.video_stream_path, self.audio_stream_path)
+        self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
         if not self.keep_segments_after_download:
             self._temp_folder_cleanup()
         print("All done!")
@@ -89,14 +74,10 @@ class Movie:
         content = html.fromstring(requests.get(self.movie_url).content)
         self.url_content_type = self.movie_url.split("/")[2].split(".")[0]
         self.movie_id = self.movie_url.split("/")[5]
-        self.studio_name = content.xpath(
-            '//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
-        self.movie_name = content.xpath(
-            '//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
-        total_duration_string = content.xpath(
-            '//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
-        self.total_duration_seconds = self._time_string_to_seconds(
-            total_duration_string)
+        self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
+        self.movie_name = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
+        total_duration_string = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
+        self.total_duration_seconds = self._time_string_to_seconds(total_duration_string)
         self._get_new_manifest_url()
         self._get_manifest_content()
         self._parse_manifest()
@@ -106,11 +87,9 @@ class Movie:
         self.file_name = f"{self.studio_name} - {self.movie_name}"
         if self.download_covers:
             try:
-                self.cover_front = content.xpath(
-                    '//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
+                self.cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
                 self.cover_front = 'https:' + self.cover_front.split("?")[0]
-                self.cover_back = content.xpath(
-                    '//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
+                self.cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
                 self.cover_back = 'https:' + self.cover_back.split("?")[0]
                 self._get_covers(self.cover_front, 'cover-a')
                 self._get_covers(self.cover_back, 'cover-b')
@@ -131,8 +110,7 @@ class Movie:
         f.write(r.content)
         f.close()
         last_modified = r.headers["last-modified"]
-        modified = time.mktime(datetime.datetime(
-            *eut.parsedate(last_modified)[:6]).timetuple())  # type: ignore
+        modified = time.mktime(datetime.datetime(*eut.parsedate(last_modified)[:6]).timetuple())  # type: ignore
         now = time.mktime(datetime.datetime.today().timetuple())
         os.utime(output, (now, modified))
 
@@ -144,16 +122,14 @@ class Movie:
         for i in range(0, len(scenes_timecodes)):
             # Replaces the first element with the last element of the previous sublist
             # and the last element with the first element of the next sublist
-            if i == 0 and i == len(scenes_timecodes)-1:
+            if i == 0 and i == len(scenes_timecodes) - 1:
                 scene_boundaries = [0, self.total_number_of_segments]
             elif i == 0:
-                scene_boundaries = [0, scenes_timecodes[i + 1][0]-1]
-            elif i == len(scenes_timecodes)-1:
-                scene_boundaries = [scenes_timecodes[i - 1]
-                                    [1]+1, self.total_number_of_segments]
+                scene_boundaries = [0, scenes_timecodes[i + 1][0] - 1]
+            elif i == len(scenes_timecodes) - 1:
+                scene_boundaries = [scenes_timecodes[i - 1][1] + 1, self.total_number_of_segments]
             else:
-                scene_boundaries = [scenes_timecodes[i-1]
-                                    [1]+1, scenes_timecodes[i + 1][0]-1]
+                scene_boundaries = [scenes_timecodes[i - 1][1] + 1, scenes_timecodes[i + 1][0] - 1]
             scenes_boundaries.append(scene_boundaries)
         return scenes_boundaries
 
@@ -166,27 +142,21 @@ class Movie:
             if scene_el_n == 0:
                 start_segment = 1
             else:
-                start_timing = scene_el.xpath(
-                    './/div[@class="dts-scene-result-image-group"]/@id')[0]
+                start_timing = scene_el.xpath('.//div[@class="dts-scene-result-image-group"]/@id')[0]
                 start_timing = start_timing.split("-")[-1]
-                start_segment = math.ceil(
-                    int(start_timing) / self.segment_duration)
-            if scene_el_n == len(scenes_elems)-1:
+                start_segment = math.ceil(int(start_timing) / self.segment_duration)
+            if scene_el_n == len(scenes_elems) - 1:
                 end_segment = self.total_number_of_segments
             else:
-                end_timing = scene_el.xpath(
-                    './/div[@data-time-code-seconds]/@data-time-code-seconds')[-1]
-                end_segment = math.ceil(
-                    int(end_timing) / self.segment_duration)
+                end_timing = scene_el.xpath('.//div[@data-time-code-seconds]/@data-time-code-seconds')[-1]
+                end_segment = math.ceil(int(end_timing) / self.segment_duration)
             scenes_segments.append([int(start_segment), int(end_segment)])
-        self.scenes_boundaries = self._broaden_scene_boundaries(
-            scenes_segments)
+        self.scenes_boundaries = self._broaden_scene_boundaries(scenes_segments)
 
     def _ffmpeg_check(self):
         ffmpeg_exe = shutil.which("ffmpeg") is not None
         if not ffmpeg_exe and self.ffmpeg_dir is None:
-            sys.exit(
-                "ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
+            sys.exit("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
 
     def _time_string_to_seconds(self, time_string):
         time_parts = list(map(int, time_string.split(':')))
@@ -211,28 +181,23 @@ class Movie:
         headers = {}
         headers["content-type"] = "application/x-www-form-urlencoded"
         data = f"movieId={self.movie_id}&isPreview=true&format=DASH"
-        content = requests.post(
-            f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
+        content = requests.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
         self.manifest_url = content["url"]
 
     def _sort_video_streams(self, video_stream_elements):
         video_streams = []
         for element in video_stream_elements:
-            video_streams.append(
-                [element.get('id'), int(element.get('height'))])
+            video_streams.append([element.get('id'), int(element.get('height'))])
         video_streams = sorted(video_streams, key=lambda x: x[1])
         return video_streams
 
     def _parse_manifest(self):
         # Parse the XML manifest
         root = ET.fromstring(self.manifest_content, None)
-        self.total_number_of_segments = self._total_number_of_segments_calc(
-            root, self.total_duration_seconds)
+        self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
 
-        self.audio_stream_id = root.xpath(
-            './/*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
-        video_adaptation_sets = root.xpath(
-            './/*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
+        self.audio_stream_id = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="audio/mp4"]//*[local-name()="Representation"]/@id')[0]
+        video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams(video_adaptation_sets)
         print("Avaliable video streams:")
         for video_stream in video_streams:
@@ -242,18 +207,14 @@ class Movie:
         elif self.target_height == 1:
             self.video_stream_id, self.target_height = video_streams[-1]
         elif self.target_height:
-            self.video_stream_id = next(
-                (sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
+            self.video_stream_id = next((sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
             if not self.video_stream_id:
-                raise RuntimeError(
-                    f"Target video resolution height {self.target_height} not found")
+                raise RuntimeError(f"Target video resolution height {self.target_height} not found")
 
     def _total_number_of_segments_calc(self, root, total_duration_seconds):
         # Get timescale
-        timescale = float(root.xpath(
-            './/*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@timescale')[0])
-        duration = float(root.xpath(
-            './/*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@duration')[0])
+        timescale = float(root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@timescale')[0])
+        duration = float(root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="SegmentTemplate"]/@duration')[0])
         # segment duration calc
         self.segment_duration = duration / timescale
         # number of segments calc
@@ -263,7 +224,7 @@ class Movie:
         return total_number_of_segments
 
     def _temp_folder_cleanup(self):
-        print("deleting segment folder...")
+        print("Deleting segment folder")
         if os.path.islink(self.download_dir_path):
             raise RuntimeError("Symlink detected! Refusing to remove.")
         elif os.path.isdir(self.download_dir_path):
@@ -274,7 +235,7 @@ class Movie:
     def _download_segments(self):
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
         if self.scene_n:
-            self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n-1]
+            self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n - 1]
 
         session = requests.Session()
         for stream_type in self.stream_types:
@@ -289,8 +250,7 @@ class Movie:
                 stream_id = self.video_stream_id
                 tqdm_desc = "Video download"
             self._download_segment(session, stream_type, 0, stream_id)
-            segments_to_download = range(
-                self.start_segment, self.end_segment+1)
+            segments_to_download = range(self.start_segment, self.end_segment + 1)
             for current_segment_number in tqdm(segments_to_download, desc=tqdm_desc):
                 if not self._download_segment(session, stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
@@ -298,8 +258,7 @@ class Movie:
                     self._get_manifest_content()
                     self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
                     if not self._download_segment(session, stream_type, current_segment_number, stream_id):
-                        sys.exit(
-                            f"{stream_type}_{stream_id}_{current_segment_number} download error")
+                        sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
 
     def _download_segment(self, session, segment_type, current_segment_number, stream_id):
         if current_segment_number == 0:
@@ -357,43 +316,32 @@ class Movie:
 
         audio_files = []
         video_files = []
-        audio_files.append(os.path.join(
-            self.download_dir_path, f"a_{self.audio_stream_id}_0.mp4"))
-        video_files.append(os.path.join(
-            self.download_dir_path, f"v_{self.video_stream_id}_0.mp4"))
+        audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_0.mp4"))
+        video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_0.mp4"))
         for num in range(self.start_segment, self.end_segment):
-            audio_files.append(os.path.join(
-                self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
-            video_files.append(os.path.join(
-                self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
-        video_files = sorted(video_files, key=lambda i: int(
-            os.path.splitext(os.path.basename(i))[0].split("_")[1]))
-        audio_files = sorted(audio_files, key=lambda i: int(
-            os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+            audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
+            video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
+        video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+        audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
 
         # concat all audio segment data into a single file
-        self._join_files(audio_files, self.audio_stream_path,
-                         tqdm_desc='Joining audio files')
+        self._join_files(audio_files, self.audio_stream_path, tqdm_desc='Joining audio files')
 
         # concat all video segment data into a single file
-        self._join_files(video_files, self.video_stream_path,
-                         tqdm_desc='Joining video files')
+        self._join_files(video_files, self.video_stream_path, tqdm_desc='Joining video files')
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-r", type=int, default=1,
-                        help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
+    parser.add_argument("-r", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
     parser.add_argument("-f", type=str, help="ffmpeg directory")
     parser.add_argument("-sn", type=int, help="Target scene to download")
-    parser.add_argument("-start", type=int, help="specify the start segment")
-    parser.add_argument("-end", type=int, help="specify the end segment")
+    parser.add_argument("-start", type=int, help="Specify the start segment")
+    parser.add_argument("-end", type=int, help="Specify the end segment")
     parser.add_argument("-c", action="store_true", help="Download covers")
-    parser.add_argument("-o", action="store_true",
-                        help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", action="store_true",
-                        help="Keep segments after download")
+    parser.add_argument("-o", action="store_true", help="Overwrite existing segments on the disk")
+    parser.add_argument("-k", action="store_true", help="Keep segments after download")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
