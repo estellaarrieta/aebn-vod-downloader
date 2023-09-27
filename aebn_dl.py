@@ -63,6 +63,7 @@ class Movie:
         if not self.keep_segments_after_download:
             self._temp_folder_cleanup()
         print("All done!")
+        print(self.file_name + ".mp4")
 
     def _remove_chars(self, text):
         for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
@@ -103,6 +104,9 @@ class Movie:
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
         output = f'{self.file_name} {cover_name}{cover_extension}'
+
+        if os.path.isfile(output):
+            return
 
         # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
         r = requests.get(cover_url)
