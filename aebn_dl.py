@@ -56,6 +56,7 @@ class Movie:
         else:
             target_working_dir = os.getcwd()
 
+        self.mux_dir_path = target_working_dir
         self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
         self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
         self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
@@ -302,7 +303,7 @@ class Movie:
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
         output_file = f"{self.file_name}.mp4"
-        output_path = os.path.join(os.getcwd(), output_file)
+        output_path = os.path.join(self.mux_dir_path, output_file)
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}"'
         if self.ffmpeg_dir:
             out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
