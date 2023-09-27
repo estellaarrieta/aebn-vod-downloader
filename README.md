@@ -8,20 +8,21 @@ Works by parsing a preview playlist to get full movie segment's urls, downloads 
 - FFmpeg (provide directory as a prameter or add to PATH)
 - lxml (https://pypi.org/project/lxml/)
 - requests (https://pypi.org/project/requests/)
+- tqdm (https://pypi.org/project/tqdm/)
 
 ## Usage
 
 1. Install the required modules using pip:
 
 ```
-pip install requests lxml
+pip install requests lxml tqdm
+or
+pip3 install requests lxml tqdm
 ```
 2. Run the script with the desired movie URL:
 ```
 python aebn_dl.py https://*.aebn.com/*/movies/*
-```
-On some Linux distrubtions you may have to run the following instead:
-```
+or
 python3 aebn_dl.py https://*.aebn.com/*/movies/*
 ```
 3. The script will download the movie and save it in the current working directory.
@@ -30,13 +31,15 @@ python3 aebn_dl.py https://*.aebn.com/*/movies/*
 
 You can customize the behavior of the script by passing different arguments when running it. The available arguments are:
 
-- `url`: The URL of the movie to download (required)
-- `-r, --resolution`: Set this flag to specify the desired video resolution by pixel height. Use 0 to select the lowest possible resolution. (default: highest available) (Note: Use only the _number_ of pixels, eg. `1080` rather than `1080p`.)
-- `-f, --ffmpeg-directory`: Set this flag to use a specific ffmpeg directory (default: try to use PATH)
-- `-sn, --scene-number`: Set this flag to specify which scene you want to download (default: downloads all available scenes as a single movie file)
-- `-c, --covers`: Set this flag to download the front and back covers (default: False)
-- `-start`: Set this flag to specify start segment (default: 1)
-- `-end`: Set this flag to specify end segment (default: total available)
-- `-o, --overwrite-segments`: Set this flag to overwrite existing audio and video segments if present on disk (default: False)
-- `-k, --keep-segments`: Set this flag to keep audio and video segments on disk after downloading (default: False)
-- `-h, --help`: Show the above information in the terminal
+| Argument | Description |
+| --- | --- |
+|`url`|The URL of the movie to download (required)|
+|`-r RESOLUTION, --resolution RESOLUTION`|Desired video resolution by pixel height (Note: Only use the _number_ of pixels, eg. _1080_ rather than _1080p_). Use 0 to select the lowest possible resolution. (default: highest available)|
+|`-f FFMPEG, --ffmpeg FFMPEG`|Set a specific ffmpeg directory|
+|`-sn SCENE, --scene SCENE`|Download a single scene using the relevant scene number on AEBN|
+|`-start SCENE_START, --scene_start SCENE_START`| Specify the start segment|
+|`-end SCENE_END, --scene_end SCENE_END`|Specify the end segment|
+|`-c, --covers`|Download front and back covers|
+|`-o, --overwrite`|Overwrite existing audio and video segments on disk if already present|
+|`-k, --keep`|Keep existing audio and video segments on disk after download|
+|`-h, --help`|Show the above information in the terminal|
