@@ -34,9 +34,9 @@ You can customize the behavior of the script by passing different arguments when
 - `-r`: The desired video resolution height (default: highest available)
 - `-f`: FFmpeg directory (default: try to use PATH)
 - `-sn`: Specify which scene to download (default: disabled)
+- `-c`: Set this flag to download the front and back covers (default: False)
 - `-start`: Specify start segment (default: 1)
 - `-end`: Specify end segment (default: total available)
-- `-c`: Set this flag to download the front and back covers (default: False)
 - `-o`: Set this flag to overwrite existing video segments if present (default: False)
 - `-k`: Set this flag to don't delete segments after downloading (default: False)
 - `-h`, `--help`: Show the above information in the terminal
