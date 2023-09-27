@@ -33,7 +33,7 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -42,7 +42,7 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.scene_n = scene_n
         self.download_covers = download_covers
-        self.overwrite_existing_segmets = overwrite_existing_segmets
+        self.overwrite_existing_segments = overwrite_existing_segments
         self.keep_segments_after_download = keep_segments_after_download
         self.stream_types = ["a", "v"]
 
@@ -270,7 +270,7 @@ class Movie:
             segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
         segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
         segment_path = os.path.join(self.download_dir_path, segment_file_name)
-        if os.path.exists(segment_path) and not self.overwrite_existing_segmets:
+        if os.path.exists(segment_path) and not self.overwrite_existing_segments:
             # print(f"found {segment_file_name}")
             return True
         try:
@@ -337,24 +337,27 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-r", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
-    parser.add_argument("-f", type=str, help="ffmpeg directory")
-    parser.add_argument("-sn", type=int, help="Target scene to download")
-    parser.add_argument("-start", type=int, help="Specify the start segment")
-    parser.add_argument("-end", type=int, help="Specify the end segment")
-    parser.add_argument("-c", action="store_true", help="Download covers")
-    parser.add_argument("-o", action="store_true", help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", action="store_true", help="Keep segments after download")
+    parser.add_argument("-r", "--resolution", type=int, default=1,
+                        help="Specifies the desired video resolution by pixel height. Use 0 to select the lowest. (default: highest available)")
+    parser.add_argument("-f", "--ffmpeg-directory", type=str, help="Specifies the location of your ffmpeg directory (default: try to use PATH)")
+    parser.add_argument("-sn", "--scene-number", type=int, help="Specifies which scene to download (default: disabled)")
+    parser.add_argument("-start", type=int, help="Specifies start segment (default: 1)")
+    parser.add_argument("-end", type=int, help="Specifies end segment (default: total available)")
+    parser.add_argument("-c", "--covers", action="store_true", help="Downloads the front and back covers (default: False)")
+    parser.add_argument("-o", "--overwrite-segments", action="store_true",
+                        help="Overwrites existing video segments on disk if present (default: False)")
+    parser.add_argument("-k", "--keep-segments", action="store_true",
+                        help="Keeps existing segments on disk after downloading (default: False)")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
-        ffmpeg_dir=args.f,
-        target_height=args.r,
-        scene_n=args.sn,
+        ffmpeg_dir=args.ffmpeg_directory,
+        target_height=args.resolution,
+        scene_n=args.scene_number,
         start_segment=args.start,
         end_segment=args.end,
-        download_covers=args.c,
-        overwrite_existing_segmets=args.o,
-        keep_segments_after_download=args.k,
+        download_covers=args.covers,
+        overwrite_existing_segments=args.overwrite_segments,
+        keep_segments_after_download=args.keep_segments,
     )
     movie_instance.download()
