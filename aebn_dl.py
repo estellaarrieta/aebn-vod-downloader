@@ -380,6 +380,22 @@ def worker(q):
         q.task_done()
 
 
+def convert_line_endings(file_path):
+    # replacement strings
+    WINDOWS_LINE_ENDING = b'\r\n'
+    UNIX_LINE_ENDING = b'\n'
+
+    with open(file_path, 'rb') as open_file:
+        content = open_file.read()
+
+    # Windows to Unix
+    if WINDOWS_LINE_ENDING in content:
+        content = content.replace(WINDOWS_LINE_ENDING, UNIX_LINE_ENDING)
+        with open(file_path, 'wb') as open_file:
+            open_file.write(content)
+        print('Converted list.txt to unix line endings, important for linux processing')
+
+
 if __name__ == "__main__":
     # Make Ctrl-C work when deamon threads are running
     signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -405,6 +421,8 @@ if __name__ == "__main__":
         download_movie(args.url)
     # if missing or invalid, check for a list.txt and download concurrently
     elif args.url == "list.txt":
+        if sys.platform == 'linux':
+            convert_line_endings("list.txt")  # important to have the proper newlines for linux
         file = open("list.txt")
         urllist = file.read().splitlines()  # remove the newlines
         file.close()
