@@ -11,6 +11,11 @@ import time
 
 from urllib3.util.retry import Retry
 
+from urllib.parse import urlparse
+import signal
+import threading
+import queue
+
 try:
     import lxml.etree as ET
     import requests
@@ -265,7 +270,7 @@ class Movie:
             elif stream_type == "v":
                 stream_id = self.video_stream_id
                 tqdm_desc = "Video download"
-            self._download_segment( stream_type, 0, stream_id)
+            self._download_segment(stream_type, 0, stream_id)
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             for current_segment_number in tqdm(segments_to_download, desc=tqdm_desc):
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
@@ -309,7 +314,7 @@ class Movie:
 
         output_path = os.path.join(self.mux_dir_path, output_file)
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
-        
+
         if self.ffmpeg_dir:
             out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
         else:
@@ -350,21 +355,9 @@ class Movie:
         self._join_files(video_files, self.video_stream_path, tqdm_desc='Joining video files')
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
-    parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
-    parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
-    parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
-    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
-    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
-    parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
-    args = parser.parse_args()
+def download_movie(url):
     movie_instance = Movie(
-        url=args.url,
+        url,
         target_download_dir=args.download_dir,
         ffmpeg_dir=args.ffmpeg,
         target_height=args.resolution,
@@ -376,3 +369,62 @@ if __name__ == "__main__":
         keep_segments_after_download=args.keep,
     )
     movie_instance.download()
+
+
+def worker(q):
+    while True:
+        value = q.get()
+        # subtract 1 because the main thread is included
+        print(f"Total threads {threading.active_count() - 1} | Processing {value}")
+        download_movie(value)
+        q.task_done()
+
+
+if __name__ == "__main__":
+    # Make Ctrl-C work when deamon threads are running
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url", help="URL of the movie")
+    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
+    parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
+    parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
+    parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
+    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
+    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
+    parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
+    parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
+    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=10)")
+    args = parser.parse_args()
+
+    q = queue.Queue()
+    # validate the url
+    result = urlparse(args.url)
+    if result.scheme and result.netloc:
+        download_movie(args.url)
+    # if missing or invalid, check for a list.txt and download concurrently
+    elif args.url == "list.txt":
+        file = open("list.txt")
+        urllist = file.read().splitlines()  # remove the newlines
+        file.close()
+        while ("" in urllist):  # remove empty strings from the list (resulted from empty lines)
+            urllist.remove("")
+
+        max_threads = args.threads or 10  # default 10 threads
+        # print("Using max threads", max_threads)
+
+        for x in range(max_threads):
+            t = threading.Thread(target=worker, args=(q,))
+            t.daemon = True
+            t.start()
+
+        for url in urllist:
+            q.put(url)
+
+        q.join()  # wait for all the threads to finish, then continue below
+
+        if q.empty():
+            print("Download queue complete")
+    else:
+        print("Invalid URL or list.txt not passed")
