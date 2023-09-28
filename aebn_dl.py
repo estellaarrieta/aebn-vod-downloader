@@ -36,7 +36,8 @@ except ModuleNotFoundError:
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
+                 download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False, target_download_dir=None):
 
         self.movie_url = url
         self.target_height = target_height
@@ -47,10 +48,12 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.keep_segments_after_download = keep_segments_after_download
+        self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
+        print(f"Saving to: {self.target_download_dir}")
         self._session_prep()
         self._scrape_info()
         self._ffmpeg_check()
@@ -73,7 +76,15 @@ class Movie:
         self.session.mount('https://', adapter)
 
     def _construct_paths(self):
-        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
+        if self.target_download_dir:
+            target_working_dir = self.target_download_dir
+            if not os.path.exists(target_working_dir):
+                os.makedirs(target_working_dir)
+        else:
+            target_working_dir = os.getcwd()
+
+        self.mux_dir_path = target_working_dir
+        self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
         self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
         self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
@@ -298,8 +309,10 @@ class Movie:
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
         output_file = f"{self.file_name}.mp4"
-        output_path = os.path.join(os.getcwd(), output_file)
+
+        output_path = os.path.join(self.mux_dir_path, output_file)
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
+        
         if self.ffmpeg_dir:
             out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
         else:
@@ -343,24 +356,26 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-r", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
-    parser.add_argument("-f", type=str, help="ffmpeg directory")
-    parser.add_argument("-sn", type=int, help="Target scene to download")
-    parser.add_argument("-start", type=int, help="Specify the start segment")
-    parser.add_argument("-end", type=int, help="Specify the end segment")
-    parser.add_argument("-c", action="store_true", help="Download covers")
-    parser.add_argument("-o", action="store_true", help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", action="store_true", help="Keep segments after download")
+    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
+    parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
+    parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
+    parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
+    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
+    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
+    parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
+    parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
-        ffmpeg_dir=args.f,
-        target_height=args.r,
-        scene_n=args.sn,
-        start_segment=args.start,
-        end_segment=args.end,
-        download_covers=args.c,
-        overwrite_existing_segmets=args.o,
-        keep_segments_after_download=args.k,
+        target_download_dir=args.download_dir,
+        ffmpeg_dir=args.ffmpeg,
+        target_height=args.resolution,
+        scene_n=args.scene,
+        start_segment=args.start_segment,
+        end_segment=args.end_segment,
+        download_covers=args.covers,
+        overwrite_existing_segmets=args.overwrite,
+        keep_segments_after_download=args.keep,
     )
     movie_instance.download()
