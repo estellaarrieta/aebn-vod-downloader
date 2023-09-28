@@ -12,10 +12,10 @@ import time
 from urllib3.util.retry import Retry
 
 try:
-    import requests
-    from requests.adapters import HTTPAdapter
     import lxml.etree as ET
+    import requests
     from lxml import html
+    from requests.adapters import HTTPAdapter
     from tqdm import tqdm
 except ModuleNotFoundError:
     print("""
@@ -93,7 +93,7 @@ class Movie:
 
     def _scrape_info(self):
         content = html.fromstring(self.session.get(self.movie_url).content)
-        self.url_content_type = self.movie_url.split("/")[2].split(".")[0]
+        self.url_content_type = self.movie_url.split("/")[3]
         self.movie_id = self.movie_url.split("/")[5]
         self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
         self.movie_name = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
