@@ -9,8 +9,11 @@ import subprocess
 import sys
 import time
 
+from urllib3.util.retry import Retry
+
 try:
     import requests
+    from requests.adapters import HTTPAdapter
     import lxml.etree as ET
     from lxml import html
     from tqdm import tqdm
@@ -30,7 +33,8 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False):
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
+                 download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False, target_download_dir=None):
 
         self.movie_url = url
         self.target_height = target_height
@@ -41,15 +45,13 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segmets = overwrite_existing_segmets
         self.keep_segments_after_download = keep_segments_after_download
+        self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
-
-    def _construct_paths(self):
-        self.download_dir_path = os.path.join(os.getcwd(), self.movie_id)
-        self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
-        self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
+        print(f"Saving to: {self.target_download_dir}")
+        self._session_prep()
         self._scrape_info()
         self._ffmpeg_check()
         self._construct_paths()
@@ -62,6 +64,27 @@ class Movie:
         print("All done!")
         print(self.file_name + ".mp4")
 
+    def _session_prep(self):
+        # https://stackoverflow.com/a/47475019/14931505
+        self.session = requests.Session()
+        retry = Retry(connect=3, backoff_factor=0.5)
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+
+    def _construct_paths(self):
+        if self.target_download_dir:
+            target_working_dir = self.target_download_dir
+            if not os.path.exists(target_working_dir):
+                os.makedirs(target_working_dir)
+        else:
+            target_working_dir = os.getcwd()
+
+        self.mux_dir_path = target_working_dir
+        self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
+        self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
+        self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
+
     def _remove_chars(self, text):
         for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
             if ch in text:
@@ -69,7 +92,7 @@ class Movie:
         return text
 
     def _scrape_info(self):
-        content = html.fromstring(requests.get(self.movie_url).content)
+        content = html.fromstring(self.session.get(self.movie_url).content)
         self.url_content_type = self.movie_url.split("/")[2].split(".")[0]
         self.movie_id = self.movie_url.split("/")[5]
         self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
@@ -79,7 +102,7 @@ class Movie:
         self._get_new_manifest_url()
         self._get_manifest_content()
         self._parse_manifest()
-        self._calcualte_scenes_segments(content)
+        self._calcualte_scenes_segments()
         self.studio_name = self._remove_chars(self.studio_name)
         self.movie_name = self._remove_chars(self.movie_name)
         self.file_name = f"{self.studio_name} - {self.movie_name}"
@@ -106,7 +129,7 @@ class Movie:
             return
 
         # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
-        r = requests.get(cover_url)
+        r = self.session.get(cover_url)
         f = open(output, "wb")
         f.write(r.content)
         f.close()
@@ -134,25 +157,16 @@ class Movie:
             scenes_boundaries.append(scene_boundaries)
         return scenes_boundaries
 
-    def _calcualte_scenes_segments(self, content):
-        # aebn does not have exact timings on the page, but
-        # we can use target scene's neighbors to roughly assume target's length
-        scenes_segments = []
-        scenes_elems = content.xpath("//section[contains(@id, 'scene-')]")
-        for scene_el_n, scene_el in enumerate(scenes_elems):
-            if scene_el_n == 0:
-                start_segment = 1
-            else:
-                start_timing = scene_el.xpath('.//div[@class="dts-scene-result-image-group"]/@id')[0]
-                start_timing = start_timing.split("-")[-1]
-                start_segment = math.ceil(int(start_timing) / self.segment_duration)
-            if scene_el_n == len(scenes_elems) - 1:
-                end_segment = self.total_number_of_segments
-            else:
-                end_timing = scene_el.xpath('.//div[@data-time-code-seconds]/@data-time-code-seconds')[-1]
-                end_segment = math.ceil(int(end_timing) / self.segment_duration)
-            scenes_segments.append([int(start_segment), int(end_segment)])
-        self.scenes_boundaries = self._broaden_scene_boundaries(scenes_segments)
+    def _calcualte_scenes_segments(self):
+        self.scenes_boundaries = []
+        response = html.fromstring(self.session.get(f"https://m.aebn.net/movie/{self.movie_id}").content)
+        scene_elems = response.xpath('//div[@class="scroller"]')
+        for scene_el in scene_elems:
+            start_timing = int(scene_el.get("data-time-start"))
+            start_segment = math.ceil(int(start_timing) / self.segment_duration)
+            end_timing = start_timing + int(scene_el.get("data-time-duration"))
+            end_segment = math.ceil(int(end_timing) / self.segment_duration)
+            self.scenes_boundaries.append([start_segment, end_segment])
 
     def _ffmpeg_check(self):
         ffmpeg_exe = shutil.which("ffmpeg") is not None
@@ -174,7 +188,7 @@ class Movie:
 
     def _get_manifest_content(self):
         # Make HTTP request to get the manifest
-        response = requests.get(self.manifest_url)
+        response = self.session.get(self.manifest_url)
         response.raise_for_status()  # Raise an exception for non-2xx status codes
         self.manifest_content = response.content
 
@@ -182,7 +196,7 @@ class Movie:
         headers = {}
         headers["content-type"] = "application/x-www-form-urlencoded"
         data = f"movieId={self.movie_id}&isPreview=true&format=DASH"
-        content = requests.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
+        content = self.session.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
         self.manifest_url = content["url"]
 
     def _sort_video_streams(self, video_stream_elements):
@@ -198,7 +212,7 @@ class Movie:
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams(video_adaptation_sets)
-        print("Avaliable video streams:")
+        print("Available video streams:")
         self.audio_stream_id, _ = video_streams[-1]
         for video_stream in video_streams:
             print(video_stream[1])
@@ -235,9 +249,11 @@ class Movie:
     def _download_segments(self):
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
         if self.scene_n:
-            self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n - 1]
+            try:
+                self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n - 1]
+            except IndexError:
+                sys.exit(f"Scene {self.scene_n} not found!")
 
-        session = requests.Session()
         for stream_type in self.stream_types:
             if not self.start_segment:
                 self.start_segment = 1
@@ -249,18 +265,19 @@ class Movie:
             elif stream_type == "v":
                 stream_id = self.video_stream_id
                 tqdm_desc = "Video download"
-            self._download_segment(session, stream_type, 0, stream_id)
+            self._download_segment( stream_type, 0, stream_id)
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             for current_segment_number in tqdm(segments_to_download, desc=tqdm_desc):
-                if not self._download_segment(session, stream_type, current_segment_number, stream_id):
+                if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
+                    self._session_prep()
                     self._get_new_manifest_url()
                     self._get_manifest_content()
                     self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
-                    if not self._download_segment(session, stream_type, current_segment_number, stream_id):
+                    if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
 
-    def _download_segment(self, session, segment_type, current_segment_number, stream_id):
+    def _download_segment(self, segment_type, current_segment_number, stream_id):
         if current_segment_number == 0:
             segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
         else:
@@ -271,7 +288,7 @@ class Movie:
             # print(f"found {segment_file_name}")
             return True
         try:
-            response = session.get(segment_url)
+            response = self.session.get(segment_url)
         except:
             return False
         if response.status_code == 404 and current_segment_number == self.total_number_of_segments:
@@ -289,8 +306,10 @@ class Movie:
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
         output_file = f"{self.file_name}.mp4"
-        output_path = os.path.join(os.getcwd(), output_file)
-        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}"'
+
+        output_path = os.path.join(self.mux_dir_path, output_file)
+        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
+        
         if self.ffmpeg_dir:
             out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
         else:
@@ -321,8 +340,8 @@ class Movie:
         for num in range(self.start_segment, self.end_segment):
             audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
             video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
-        video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
-        audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+        # video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
+        # audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
 
         # concat all audio segment data into a single file
         self._join_files(audio_files, self.audio_stream_path, tqdm_desc='Joining audio files')
@@ -334,24 +353,26 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-r", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
-    parser.add_argument("-f", type=str, help="ffmpeg directory")
-    parser.add_argument("-sn", type=int, help="Target scene to download")
-    parser.add_argument("-start", type=int, help="Specify the start segment")
-    parser.add_argument("-end", type=int, help="Specify the end segment")
-    parser.add_argument("-c", action="store_true", help="Download covers")
-    parser.add_argument("-o", action="store_true", help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", action="store_true", help="Keep segments after download")
+    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
+    parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
+    parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
+    parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
+    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
+    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
+    parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
+    parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
-        ffmpeg_dir=args.f,
-        target_height=args.r,
-        scene_n=args.sn,
-        start_segment=args.start,
-        end_segment=args.end,
-        download_covers=args.c,
-        overwrite_existing_segmets=args.o,
-        keep_segments_after_download=args.k,
+        target_download_dir=args.download_dir,
+        ffmpeg_dir=args.ffmpeg,
+        target_height=args.resolution,
+        scene_n=args.scene,
+        start_segment=args.start_segment,
+        end_segment=args.end_segment,
+        download_covers=args.covers,
+        overwrite_existing_segmets=args.overwrite,
+        keep_segments_after_download=args.keep,
     )
     movie_instance.download()
