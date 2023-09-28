@@ -12,26 +12,23 @@ import time
 from urllib3.util.retry import Retry
 
 try:
-    from tqdm import tqdm
-except ModuleNotFoundError:
-    print("You need to install the lxml module. (https://pypi.org/project/tqdm/)")
-    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install tqdm")
-    sys.exit()
-
-try:
-    import lxml.etree as ET
-    from lxml import html
-except ModuleNotFoundError:
-    print("You need to install the lxml module. (https://pypi.org/project/lxml/)")
-    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install lxml")
-    sys.exit()
-
-try:
     import requests
     from requests.adapters import HTTPAdapter
+    import lxml.etree as ET
+    from lxml import html
+    from tqdm import tqdm
 except ModuleNotFoundError:
-    print("You need to install the requests module. (https://pypi.org/project/requests/)")
-    print("If you have pip (normally installed with python), run this command in a terminal (cmd): pip install requests")
+    print("""
+You need to install required modules:
+    lxml (https://pypi.org/project/lxml/)
+    requests (https://pypi.org/project/requests/)
+    tqdm (https://pypi.org/project/tqdm/)
+
+If you have pip (normally installed with python), run this command in a terminal (cmd):
+    pip install lxml requests tqdm
+    or
+    pip3 install lxml requests tqdm
+          """)
     sys.exit()
 
 
