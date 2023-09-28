@@ -34,6 +34,7 @@ You can customize the behavior of the script by passing different arguments when
 | --- | --- |
 |`-h, --help`|Show this help message and exit|
 |`url`|The URL of the movie to download (required)|
+|`-d, --download_dir DOWNLOAD_DIR`|Specify a target download directory|
 |`-r RESOLUTION, --resolution RESOLUTION`|Target video resolution height. Use 0 to select the lowest. Default is the highest|
 |`-f FFMPEG, --ffmpeg FFMPEG`|ffmpeg directory|
 |`-sn SCENE, --scene SCENE`|Target scene to download|
@@ -42,4 +43,3 @@ You can customize the behavior of the script by passing different arguments when
 |`-c, --covers`|Download covers|
 |`-o, --overwrite`|Overwrite existing segments on the disk|
 |`-k, --keep`|Keep segments after download|
-|`-t, --target_dir TARGET_DIR`|Specify a target download directory|

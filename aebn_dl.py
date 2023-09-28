@@ -348,26 +348,26 @@ class Movie:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
+    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
     parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
     parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
     parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
-    parser.add_argument("-start", "--scene_start", type=int, help="Specify the start segment")
-    parser.add_argument("-end", "--scene_end", type=int, help="Specify the end segment")
+    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
+    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
-    parser.add_argument("-t", "--target_dir", type=str, help="Specify a target download directory")
     args = parser.parse_args()
     movie_instance = Movie(
         url=args.url,
+        target_download_dir=args.download_dir,
         ffmpeg_dir=args.ffmpeg,
         target_height=args.resolution,
         scene_n=args.scene,
-        start_segment=args.scene_start,
-        end_segment=args.scene_end,
+        start_segment=args.start_segment,
+        end_segment=args.end_segment,
         download_covers=args.covers,
         overwrite_existing_segmets=args.overwrite,
         keep_segments_after_download=args.keep,
-        target_download_dir=args.target_dir
     )
     movie_instance.download()
