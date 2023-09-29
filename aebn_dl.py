@@ -60,7 +60,6 @@ class Movie:
         self._ffmpeg_check()
         self._construct_paths()
         self._download_segments()
-        print("Download complete")
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
         self._temp_folder_cleanup()
@@ -278,7 +277,10 @@ class Movie:
                 tqdm_desc = "Video download"
             self._download_segment(stream_type, 0, stream_id)
             segments_to_download = range(self.start_segment, self.end_segment + 1)
-            for current_segment_number in tqdm(segments_to_download, desc=tqdm_desc):
+            # using tqdm object so we can manipulate progress
+            # and display it as segment 0 was part of the loop
+            download_bar = tqdm(total=len(segments_to_download)+1, desc=tqdm_desc)
+            for current_segment_number in segments_to_download:
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
                     self._session_prep()
@@ -286,6 +288,7 @@ class Movie:
                     self._get_manifest_content()
                     if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
+            download_bar.update(download_bar.total)
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
         if current_segment_number == 0:
