@@ -57,8 +57,16 @@ class Movie:
         print(f"Saving to: {self.target_download_dir or os.getcwd()}")
         self._session_prep()
         self._scrape_info()
-        self._ffmpeg_check()
         self._construct_paths()
+        self._get_new_manifest_url()
+        self._get_manifest_content()
+        self._parse_manifest()
+        if self.scene_n:
+            self.file_name += f" Scene {self.scene_n}"
+        self.file_name += f" {self.target_height}p"
+        print(self.file_name)
+        self._calcualte_scenes_boundaries()
+        self._ffmpeg_check()
         self._download_segments()
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
@@ -101,10 +109,6 @@ class Movie:
         self.movie_name = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
         total_duration_string = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
         self.total_duration_seconds = self._time_string_to_seconds(total_duration_string)
-        self._get_new_manifest_url()
-        self._get_manifest_content()
-        self._parse_manifest()
-        self._calcualte_scenes_boundaries()
         self.studio_name = self._remove_chars(self.studio_name)
         self.movie_name = self._remove_chars(self.movie_name)
         self.file_name = f"{self.studio_name} - {self.movie_name}"
@@ -118,10 +122,6 @@ class Movie:
                 self._get_covers(self.cover_back, 'cover-b')
             except Exception as e:
                 print("Error fetching cover urls: ", e)
-        if self.scene_n:
-            self.file_name += f" Scene {self.scene_n}"
-        self.file_name += f" {self.target_height}p"
-        print(self.file_name)
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
@@ -288,9 +288,20 @@ class Movie:
                     self._get_manifest_content()
                     if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
-            download_bar.update(download_bar.total)
+                download_bar.update(1)
+            download_bar.update(1)
+            download_bar.close()
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
+        segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
+        segment_path = os.path.join(self.download_dir_path, segment_file_name)
+        if os.path.exists(segment_path) and not self.overwrite_existing_segments:
+            if return_bytes:
+                with open(segment_path, 'rb') as segment_file:
+                    content = segment_file.read()
+                    segment_file.close()
+                    return content
+            return True
         if current_segment_number == 0:
             segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
         else:
@@ -301,11 +312,7 @@ class Movie:
             return False
         if return_bytes:
             return response.content
-        segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
-        segment_path = os.path.join(self.download_dir_path, segment_file_name)
-        if os.path.exists(segment_path) and not self.overwrite_existing_segments:
-            # print(f"found {segment_file_name}")
-            return True
+
         if response.status_code == 404 and current_segment_number == self.total_number_of_segments:
             # just skip if the last segment does not exists
             # segment calc returns a rouded up float which sometimes bigger that the actual number of segments
