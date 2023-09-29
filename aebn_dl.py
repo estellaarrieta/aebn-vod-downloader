@@ -54,7 +54,7 @@ class Movie:
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
-        print(f"Saving to: {self.target_download_dir}")
+        print(f"Saving to: {self.target_download_dir or os.getcwd()}")
         self._session_prep()
         self._scrape_info()
         self._ffmpeg_check()
