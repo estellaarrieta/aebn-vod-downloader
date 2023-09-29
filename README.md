@@ -4,7 +4,7 @@
 Works by parsing a preview playlist to get full movie segment's urls, downloads them, and uses ffmpeg to mux video and audio.
 
 ## Dependencies
-
+- Python 3.6 or higher
 - FFmpeg (provide directory as a prameter or add to PATH)
 - lxml (https://pypi.org/project/lxml/)
 - requests (https://pypi.org/project/requests/)
