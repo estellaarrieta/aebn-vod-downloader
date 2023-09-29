@@ -49,8 +49,11 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segments = overwrite_existing_segments
         self.keep_segments_after_download = keep_segments_after_download
-        self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
+        if target_download_dir:
+            self.target_download_dir = target_download_dir
+        else:
+            self.target_download_dir = os.getcwd()
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
@@ -82,15 +85,10 @@ class Movie:
         self.session.mount('https://', adapter)
 
     def _construct_paths(self):
-        if self.target_download_dir:
-            target_working_dir = self.target_download_dir
-            if not os.path.exists(target_working_dir):
-                os.makedirs(target_working_dir)
-        else:
-            target_working_dir = os.getcwd()
+        if not os.path.exists(self.target_download_dir):
+            os.makedirs(self.target_download_dir)
 
-        self.mux_dir_path = target_working_dir
-        self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
+        self.download_dir_path = os.path.join(self.target_download_dir, self.movie_id)
         self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
         self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
@@ -124,7 +122,7 @@ class Movie:
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
-        output = f'{self.file_name} {cover_name}{cover_extension}'
+        output = os.path.join(self.target_download_dir, f'{self.file_name} {cover_name}{cover_extension}')
 
         if os.path.isfile(output):
             return
@@ -326,7 +324,7 @@ class Movie:
         return True
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
-        output_path = os.path.join(self.mux_dir_path, f"{self.file_name}.mp4")
+        output_path = os.path.join(self.target_download_dir, f"{self.file_name}.mp4")
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
 
         if self.ffmpeg_dir:
