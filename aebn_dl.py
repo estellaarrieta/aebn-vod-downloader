@@ -337,7 +337,7 @@ class Movie:
         video_files = []
         audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_0.mp4"))
         video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_0.mp4"))
-        for num in range(self.start_segment, self.end_segment):
+        for num in range(self.start_segment, self.end_segment + 1):
             audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
             video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
         # video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
