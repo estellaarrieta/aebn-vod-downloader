@@ -427,7 +427,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=10)")
+    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     args = parser.parse_args()
 
     q = queue.Queue()
@@ -445,7 +445,24 @@ if __name__ == "__main__":
         while ("" in urllist):  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
-        max_threads = args.threads or 10  # default 10 threads
+        if args.threads:
+            while True:
+                answer = input('''
+\033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
+may result in throttling and/or get your IP blocked.
+HTTP requests to servers usually have rate limits, so hammering a server
+will throttle your connections and cause temporary timeouts.
+Be reasonable and use with caution!\033[0m
+                               
+Are you sure you want to continue? (Y/n) ''').casefold()
+                if answer == "y" or answer == "":
+                    print()
+                    break
+                elif answer == "n":
+                    sys.exit()
+                else:
+                    print("Please enter y or n")
+        max_threads = args.threads or 5
         # print("Using max threads", max_threads)
 
         for x in range(max_threads):

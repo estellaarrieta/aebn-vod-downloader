@@ -33,7 +33,7 @@ You can use a `list.txt` file with multiple URL's (one per line) and pass it ins
 ```
 python aebn_dl.py list.txt
 ```
-It will download the videos in parallel with a default of 10 threads. The download queue will keep replenishing to the set maximum threads, until all the URL's are processed. You can change the threads with the `-t/--threads` argument.
+It will download the videos in parallel with a default of 5 threads (concurrent downloads). The download queue will keep replenishing to the set maximum threads, until all the URL's are processed. You can change the threads with the `-t/--threads` argument.
 
 **Please don't abuse this feature, hammering the servers with high concurrent downloads might throttle the http connections, or possibly get your IP blocked. So use with caution and try to stay under the radar.**
 
@@ -54,4 +54,4 @@ You can customize the behavior of the script by passing different arguments when
 |`-c, --covers`|Download front and back covers|
 |`-o, --overwrite`|Overwrite existing audio and video segments if already present|
 |`-k, --keep`|Keep audio and video segments after download|
-|`-t, --threads`|Threads for concurrent downloads (default=10)|
+|`-t, --threads`|Threads for concurrent downloads (default=5)|
