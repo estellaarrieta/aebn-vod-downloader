@@ -4,17 +4,16 @@ import datetime
 import email.utils as eut
 import math
 import os
+import queue
 import shutil
+import signal
 import subprocess
 import sys
+import threading
 import time
+from urllib.parse import urlparse
 
 from urllib3.util.retry import Retry
-
-from urllib.parse import urlparse
-import signal
-import threading
-import queue
 
 try:
     import lxml.etree as ET
@@ -64,8 +63,7 @@ class Movie:
         print("Download complete")
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
-        if not self.keep_segments_after_download:
-            self._temp_folder_cleanup()
+        self._temp_folder_cleanup()
         print("All done!")
         print(self.file_name + ".mp4")
 
@@ -227,13 +225,10 @@ class Movie:
         return total_number_of_segments
 
     def _temp_folder_cleanup(self):
-        print("Deleting segment folder")
-        if os.path.islink(self.download_dir_path):
-            raise RuntimeError("Symlink detected! Refusing to remove.")
-        elif os.path.isdir(self.download_dir_path):
-            shutil.rmtree(self.download_dir_path)
-        else:
-            print(f"Unexpected path type: {self.download_dir_path}")
+        if not self.keep_segments_after_download:
+            self._delete_joined_streams()
+        if not os.listdir(self.download_dir_path):
+            os.rmdir(self.download_dir_path)
 
     def _download_segments(self):
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
@@ -307,20 +302,24 @@ class Movie:
 
     def _join_files(self, files, output_path, tqdm_desc):
         with open(output_path, 'wb') as f:
-            for segment_file_path in tqdm(files, desc=tqdm_desc):
+            for segment_file_path in tqdm(files, desc=f"Joining {tqdm_desc}"):
                 with open(segment_file_path, 'rb') as segment_file:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
-                if not self.keep_segments_after_download:
-                    os.remove(segment_file_path)
+        if not self.keep_segments_after_download:
+            for segment_file_path in tqdm(files, desc=f"Deleting {tqdm_desc}"):
+                os.remove(segment_file_path)
 
-    def _join_segments(self):
-        # delete old joined streams if found
+    def _delete_joined_streams(self):
         if os.path.exists(self.audio_stream_path):
             os.remove(self.audio_stream_path)
         if os.path.exists(self.video_stream_path):
             os.remove(self.video_stream_path)
+
+    def _join_segments(self):
+        # delete old joined streams if found
+        self._delete_joined_streams()
 
         audio_files = []
         video_files = []
@@ -333,11 +332,10 @@ class Movie:
         # audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
 
         # concat all audio segment data into a single file
-        self._join_files(audio_files, self.audio_stream_path, tqdm_desc='Joining audio files')
+        self._join_files(audio_files, self.audio_stream_path, tqdm_desc='audio segments')
 
         # concat all video segment data into a single file
-        self._join_files(video_files, self.video_stream_path, tqdm_desc='Joining video files')
-
+        self._join_files(video_files, self.video_stream_path, tqdm_desc='video segments')
 
 def download_movie(url):
     movie_instance = Movie(
