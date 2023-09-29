@@ -217,6 +217,8 @@ class Movie:
             seg_data = self._download_segment("a", data_segment_number, stream_id, return_bytes=True)
             if not ffmpeg_error_check(seg_0 + seg_data):
                 return stream_id
+            else:
+                print("Skipping bad audio stream")
 
     def _parse_manifest(self):
         # Parse the XML manifest
