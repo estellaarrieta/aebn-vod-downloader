@@ -146,22 +146,6 @@ class Movie:
         if os.path.isfile(output):
             print("Saved cover:", output)
 
-    def _broaden_scene_boundaries(self, scenes_timecodes):
-        scenes_boundaries = []
-        for i in range(0, len(scenes_timecodes)):
-            # Replaces the first element with the last element of the previous sublist
-            # and the last element with the first element of the next sublist
-            if i == 0 and i == len(scenes_timecodes) - 1:
-                scene_boundaries = [0, self.total_number_of_segments]
-            elif i == 0:
-                scene_boundaries = [0, scenes_timecodes[i + 1][0] - 1]
-            elif i == len(scenes_timecodes) - 1:
-                scene_boundaries = [scenes_timecodes[i - 1][1] + 1, self.total_number_of_segments]
-            else:
-                scene_boundaries = [scenes_timecodes[i - 1][1] + 1, scenes_timecodes[i + 1][0] - 1]
-            scenes_boundaries.append(scene_boundaries)
-        return scenes_boundaries
-
     def _calcualte_scenes_segments(self):
         self.scenes_boundaries = []
         response = html.fromstring(self.session.get(f"https://m.aebn.net/movie/{self.movie_id}").content)
