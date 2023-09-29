@@ -22,6 +22,8 @@ pip3 install requests lxml tqdm
 2. Run the script with the desired movie URL:
 ```
 python aebn_dl.py https://*.aebn.com/*/movies/*
+or
+python3 aebn_dl.py https://*.aebn.com/*/movies/*
 ```
 
 3. The script will download the movie and save it in the current working directory.
@@ -35,11 +37,11 @@ You can customize the behavior of the script by passing different arguments when
 |`-h, --help`|Show this help message and exit|
 |`url`|The URL of the movie to download (required)|
 |`-d, --download_dir DOWNLOAD_DIR`|Specify a target download directory|
-|`-r RESOLUTION, --resolution RESOLUTION`|Target video resolution height. Use 0 to select the lowest. Default is the highest|
-|`-f FFMPEG, --ffmpeg FFMPEG`|ffmpeg directory|
-|`-sn SCENE, --scene SCENE`|Target scene to download|
+|`-r RESOLUTION, --resolution RESOLUTION`|Desired video resolution by pixel height. Use 0 to select the lowest available resolution. (default: highest available)|
+|`-f FFMPEG, --ffmpeg FFMPEG`|Specify the location of your ffmpeg directory|
+|`-sn SCENE, --scene SCENE`|Download a single scene using the relevant scene number on AEBN|
 |`-start SCENE_START, --scene_start SCENE_START`| Specify the start segment|
 |`-end SCENE_END, --scene_end SCENE_END`|Specify the end segment|
-|`-c, --covers`|Download covers|
-|`-o, --overwrite`|Overwrite existing segments on the disk|
-|`-k, --keep`|Keep segments after download|
+|`-c, --covers`|Download front and back covers|
+|`-o, --overwrite`|Overwrite existing audio and video segments if already present|
+|`-k, --keep`|Keep audio and video segments after download|
