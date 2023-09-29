@@ -61,8 +61,7 @@ class Movie:
         self._get_new_manifest_url()
         self._get_manifest_content()
         self._parse_manifest()
-        if self.scene_n:
-            self.file_name += f" Scene {self.scene_n}"
+        self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
         self.file_name += f" {self.target_height}p"
         print(self.file_name)
         self._calcualte_scenes_boundaries()
@@ -279,7 +278,8 @@ class Movie:
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             # using tqdm object so we can manipulate progress
             # and display it as segment 0 was part of the loop
-            download_bar = tqdm(total=len(segments_to_download)+1, desc=tqdm_desc)
+            download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc)
+            download_bar.update(1)
             for current_segment_number in segments_to_download:
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
@@ -289,7 +289,6 @@ class Movie:
                     if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
                 download_bar.update(1)
-            download_bar.update(1)
             download_bar.close()
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
@@ -327,9 +326,7 @@ class Movie:
         return True
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
-        output_file = f"{self.file_name}.mp4"
-
-        output_path = os.path.join(self.mux_dir_path, output_file)
+        output_path = os.path.join(self.mux_dir_path, f"{self.file_name}.mp4")
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
 
         if self.ffmpeg_dir:
