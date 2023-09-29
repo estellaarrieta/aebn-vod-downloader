@@ -365,7 +365,7 @@ def download_movie(url):
         start_segment=args.start_segment,
         end_segment=args.end_segment,
         download_covers=args.covers,
-        overwrite_existing_segmets=args.overwrite,
+        overwrite_existing_segments=args.overwrite,
         keep_segments_after_download=args.keep,
     )
     movie_instance.download()
