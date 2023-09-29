@@ -39,7 +39,7 @@ If you have pip (normally installed with python), run this command in a terminal
 
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
-                 download_covers=False, overwrite_existing_segmets=False, keep_segments_after_download=False, target_download_dir=None):
+                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False, target_download_dir=None):
 
         self.movie_url = url
         self.target_height = target_height
@@ -48,7 +48,7 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.scene_n = scene_n
         self.download_covers = download_covers
-        self.overwrite_existing_segmets = overwrite_existing_segmets
+        self.overwrite_existing_segments = overwrite_existing_segments
         self.keep_segments_after_download = keep_segments_after_download
         self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
@@ -289,7 +289,7 @@ class Movie:
             segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
         segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
         segment_path = os.path.join(self.download_dir_path, segment_file_name)
-        if os.path.exists(segment_path) and not self.overwrite_existing_segmets:
+        if os.path.exists(segment_path) and not self.overwrite_existing_segments:
             # print(f"found {segment_file_name}")
             return True
         try:
@@ -342,7 +342,7 @@ class Movie:
         video_files = []
         audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_0.mp4"))
         video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_0.mp4"))
-        for num in range(self.start_segment, self.end_segment):
+        for num in range(self.start_segment, self.end_segment + 1):
             audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
             video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
         # video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
@@ -403,14 +403,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
     parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
-    parser.add_argument("-r", "--resolution", type=int, default=1, help="Target video resolution height. Use 0 to select the lowest. Default is the highest")
-    parser.add_argument("-f", "--ffmpeg", type=str, help="ffmpeg directory")
-    parser.add_argument("-sn", "--scene", type=int, help="Target scene to download")
+    parser.add_argument("-r", "--resolution", type=int, default=1, help="Desired video resolution by pixel height. Use 0 to select the lowest available resolution. (default: highest available)")
+    parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
+    parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
     parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
     parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
-    parser.add_argument("-c", "--covers", action="store_true", help="Download covers")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing segments on the disk")
-    parser.add_argument("-k", "--keep", action="store_true", help="Keep segments after download")
+    parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments if already present")
+    parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=10)")
     args = parser.parse_args()
 
