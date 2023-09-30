@@ -40,7 +40,7 @@ If you have pip (normally installed with python), run this command in a terminal
 
 class Movie:
     def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
-                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
+                 scene_padding, download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -51,6 +51,7 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segments = overwrite_existing_segments
         self.keep_segments_after_download = keep_segments_after_download
+        self.scene_padding = scene_padding
         self.stream_types = ["a", "v"]
         if target_download_dir:
             self.target_download_dir = target_download_dir
@@ -60,6 +61,11 @@ class Movie:
     def download(self):
         print(f"Input URL: {self.movie_url}")
         print(f"Saving to: {self.target_download_dir or os.getcwd()}")
+        if self.scene_padding:
+            if self.scene_n:
+                print(f"Scene padding: {self.scene_padding} seconds")
+            else:
+                print(f"Downloading the full movie, scene padding will be ignored")
         self._session_prep()
         self._scrape_info()
         self._construct_paths()
@@ -153,8 +159,13 @@ class Movie:
         scene_elems = response.xpath('//div[@class="scroller"]')
         for scene_el in scene_elems:
             start_timing = int(scene_el.get("data-time-start"))
-            start_segment = math.ceil(int(start_timing) / self.segment_duration)
             end_timing = start_timing + int(scene_el.get("data-time-duration"))
+            if self.scene_padding and self.scene_n:
+                start_timing_padded = start_timing - self.scene_padding
+                start_timing = start_timing_padded if start_timing_padded >= 0 else 0
+                end_timing_padded = end_timing + self.scene_padding
+                end_timing = end_timing_padded if end_timing_padded <= self.total_duration_seconds else self.total_duration_seconds
+            start_segment = math.ceil(int(start_timing) / self.segment_duration)
             end_segment = math.ceil(int(end_timing) / self.segment_duration)
             self.scenes_boundaries.append([start_segment, end_segment])
 
@@ -268,13 +279,16 @@ class Movie:
             except IndexError:
                 sys.exit(f"Scene {self.scene_n} not found!")
 
+        if not self.start_segment:
+            self.start_segment = 1
+        if not self.end_segment:
+            self.end_segment = self.total_number_of_segments
+
+        print(f"Downloading segments {self.start_segment} - {self.end_segment}")
+
         for stream_type in self.stream_types:
             stream_id = ""
             tqdm_desc = ""
-            if not self.start_segment:
-                self.start_segment = 1
-            if not self.end_segment:
-                self.end_segment = self.total_number_of_segments
             if stream_type == "a":
                 stream_id = self.audio_stream_id
                 tqdm_desc = "Audio download"
@@ -392,6 +406,7 @@ def download_movie(url):
         download_covers=args.covers,
         overwrite_existing_segments=args.overwrite,
         keep_segments_after_download=args.keep,
+        scene_padding=args.padding
     )
     movie_instance.download()
 
@@ -437,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
+    parser.add_argument("-p", "--padding", type=int, help="Set padding for scenes boundaries in seconds")
     args = parser.parse_args()
 
     q = queue.Queue()
