@@ -37,8 +37,8 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
-                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False, target_download_dir=None):
+    def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
+                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -211,7 +211,7 @@ class Movie:
             # grab audio segment from the middle of the stream
             data_segment_number = int(self.total_number_of_segments / 2)
             seg_data = self._download_segment("a", data_segment_number, stream_id, return_bytes=True)
-            if not ffmpeg_error_check(seg_0 + seg_data):
+            if not ffmpeg_error_check(seg_0 + seg_data):  # type: ignore
                 return stream_id
             else:
                 print("Skipping bad audio stream")
@@ -262,6 +262,8 @@ class Movie:
                 sys.exit(f"Scene {self.scene_n} not found!")
 
         for stream_type in self.stream_types:
+            stream_id = ""
+            tqdm_desc = ""
             if not self.start_segment:
                 self.start_segment = 1
             if not self.end_segment:
