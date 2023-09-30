@@ -18,6 +18,7 @@ from urllib3.util.retry import Retry
 try:
     import lxml.etree as ET
     import requests
+    from fake_useragent import UserAgent
     from lxml import html
     from requests.adapters import HTTPAdapter
     from tqdm import tqdm
@@ -26,12 +27,13 @@ except ModuleNotFoundError:
 You need to install required modules:
     lxml (https://pypi.org/project/lxml/)
     requests (https://pypi.org/project/requests/)
+    fake-useragent (https://pypi.org/project/fake-useragent/)
     tqdm (https://pypi.org/project/tqdm/)
 
 If you have pip (normally installed with python), run this command in a terminal (cmd):
-    pip install lxml requests tqdm
+    pip install lxml requests tqdm fake-useragent
     or
-    pip3 install lxml requests tqdm
+    pip3 install lxml requests tqdm fake-useragent
           """)
     sys.exit()
 
@@ -83,6 +85,11 @@ class Movie:
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
+
+        # setting random user agent
+        user_agent = UserAgent()
+        random_user_agent = user_agent.random
+        self.session.headers["User-Agent"] = random_user_agent
 
     def _construct_paths(self):
         if not os.path.exists(self.target_download_dir):
