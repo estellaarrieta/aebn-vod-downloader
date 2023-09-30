@@ -9,15 +9,16 @@ Works by parsing a preview playlist to get full movie segment's urls, downloads 
 - lxml (https://pypi.org/project/lxml/)
 - requests (https://pypi.org/project/requests/)
 - tqdm (https://pypi.org/project/tqdm/)
+- fake-useragent (https://pypi.org/project/fake-useragent/)
 
 ## Usage
 
 1. Install the required modules using pip:
 
 ```
-pip install requests lxml tqdm
+pip install requests lxml tqdm fake-useragent
 or
-pip3 install requests lxml tqdm
+pip3 install requests lxml tqdm fake-useragent
 ```
 2. Run the script with the desired movie URL:
 ```
