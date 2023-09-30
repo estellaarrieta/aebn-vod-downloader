@@ -37,8 +37,8 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None,
-                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False, target_download_dir=None):
+    def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
+                 download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -49,8 +49,11 @@ class Movie:
         self.download_covers = download_covers
         self.overwrite_existing_segments = overwrite_existing_segments
         self.keep_segments_after_download = keep_segments_after_download
-        self.target_download_dir = target_download_dir
         self.stream_types = ["a", "v"]
+        if target_download_dir:
+            self.target_download_dir = target_download_dir
+        else:
+            self.target_download_dir = os.getcwd()
 
     def download(self):
         print(f"Input URL: {self.movie_url}")
@@ -82,15 +85,10 @@ class Movie:
         self.session.mount('https://', adapter)
 
     def _construct_paths(self):
-        if self.target_download_dir:
-            target_working_dir = self.target_download_dir
-            if not os.path.exists(target_working_dir):
-                os.makedirs(target_working_dir)
-        else:
-            target_working_dir = os.getcwd()
+        if not os.path.exists(self.target_download_dir):
+            os.makedirs(self.target_download_dir)
 
-        self.mux_dir_path = target_working_dir
-        self.download_dir_path = os.path.join(target_working_dir, self.movie_id)
+        self.download_dir_path = os.path.join(self.target_download_dir, self.movie_id)
         self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
         self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
 
@@ -124,7 +122,7 @@ class Movie:
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
-        output = f'{self.file_name} {cover_name}{cover_extension}'
+        output = os.path.join(self.target_download_dir, f'{self.file_name} {cover_name}{cover_extension}')
 
         if os.path.isfile(output):
             return
@@ -213,7 +211,7 @@ class Movie:
             # grab audio segment from the middle of the stream
             data_segment_number = int(self.total_number_of_segments / 2)
             seg_data = self._download_segment("a", data_segment_number, stream_id, return_bytes=True)
-            if not ffmpeg_error_check(seg_0 + seg_data):
+            if not ffmpeg_error_check(seg_0 + seg_data):  # type: ignore
                 return stream_id
             else:
                 print("Skipping bad audio stream")
@@ -264,6 +262,8 @@ class Movie:
                 sys.exit(f"Scene {self.scene_n} not found!")
 
         for stream_type in self.stream_types:
+            stream_id = ""
+            tqdm_desc = ""
             if not self.start_segment:
                 self.start_segment = 1
             if not self.end_segment:
@@ -326,7 +326,7 @@ class Movie:
         return True
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
-        output_path = os.path.join(self.mux_dir_path, f"{self.file_name}.mp4")
+        output_path = os.path.join(self.target_download_dir, f"{self.file_name}.mp4")
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
 
         if self.ffmpeg_dir:
@@ -429,7 +429,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=10)")
+    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     args = parser.parse_args()
 
     q = queue.Queue()
@@ -447,7 +447,24 @@ if __name__ == "__main__":
         while ("" in urllist):  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
-        max_threads = args.threads or 10  # default 10 threads
+        if args.threads:
+            while True:
+                answer = input('''
+\033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
+may result in throttling and/or get your IP blocked.
+HTTP requests to servers usually have rate limits, so hammering a server
+will throttle your connections and cause temporary timeouts.
+Be reasonable and use with caution!\033[0m
+                               
+Are you sure you want to continue? (Y/n) ''').casefold()
+                if answer == "y" or answer == "":
+                    print()
+                    break
+                elif answer == "n":
+                    sys.exit()
+                else:
+                    print("Please enter y or n")
+        max_threads = args.threads or 5
         # print("Using max threads", max_threads)
 
         for x in range(max_threads):
