@@ -311,9 +311,9 @@ class Movie:
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             # using tqdm object so we can manipulate progress
             # and display it as segment 0 was part of the loop
-            if not self.is_silent:
-                download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc)
-            download_bar.update() if download_bar else None  # increment by 1
+
+            download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc, disable=self.is_silent)
+            download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
@@ -322,8 +322,8 @@ class Movie:
                     self._get_manifest_content()
                     if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
-                download_bar.update() if download_bar else None
-            download_bar.close() if download_bar else None
+                download_bar.update()
+            download_bar.close()
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
         segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
@@ -371,25 +371,22 @@ class Movie:
         assert out.returncode == 0
 
     def _join_files(self, files, output_path, tqdm_desc):
-        if not self.is_silent:
-            join_bar = tqdm(files, desc=f"Joining {tqdm_desc}")
-            if not self.keep_segments_after_download:
-                delete_bar = tqdm(files, desc=f"Deleting {tqdm_desc}")
+        join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
+        delete_bar = tqdm(files, desc=f"Deleting {tqdm_desc}", disable=self.is_silent or self.keep_segments_after_download)
         with open(output_path, 'wb') as f:
             for segment_file_path in files:
                 with open(segment_file_path, 'rb') as segment_file:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
-                    if not self.is_silent:
-                        join_bar.update()
-                    if not self.keep_segments_after_download:
-                        os.remove(segment_file_path)
-                        if not self.is_silent:
-                            delete_bar.update()
+                    join_bar.update()
 
-        delete_bar.close() if delete_bar else None
-        join_bar.close() if join_bar else None
+                if not self.keep_segments_after_download:
+                    os.remove(segment_file_path)
+                    delete_bar.update()
+
+        join_bar.close()
+        delete_bar.close()
 
     def _delete_joined_streams(self):
         if os.path.exists(self.audio_stream_path):
