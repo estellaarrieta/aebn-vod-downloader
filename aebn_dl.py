@@ -69,6 +69,12 @@ class Movie:
                 logger.info(f"Scene padding: {self.scene_padding} seconds")
             else:
                 logger.info(f"Downloading the full movie, scene padding will be ignored")
+        if self.target_height > 1:
+            logger.info(f"Target resolution: {self.target_height}")
+        elif self.target_height == 1:
+            logger.info(f"Target resolution: Highest")
+        elif self.target_height == 0:
+            logger.info(f"Target resolution: Lowest")
         self._session_prep()
         self._scrape_info()
         self._construct_paths()
