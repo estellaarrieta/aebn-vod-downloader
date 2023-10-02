@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import email.utils as eut
+import logging
 import math
 import os
 import queue
@@ -40,7 +41,7 @@ If you have pip (normally installed with python), run this command in a terminal
 
 class Movie:
     def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
-                 scene_padding, download_covers=False, overwrite_existing_segments=False, keep_segments_after_download=False):
+                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False):
 
         self.movie_url = url
         self.target_height = target_height
@@ -49,23 +50,24 @@ class Movie:
         self.ffmpeg_dir = ffmpeg_dir
         self.scene_n = scene_n
         self.download_covers = download_covers
-        self.overwrite_existing_segments = overwrite_existing_segments
+        self.overwrite_existing_files = overwrite_existing_files
         self.keep_segments_after_download = keep_segments_after_download
         self.scene_padding = scene_padding
         self.stream_types = ["a", "v"]
+        self.is_silent = is_silent
         if target_download_dir:
             self.target_download_dir = target_download_dir
         else:
             self.target_download_dir = os.getcwd()
 
     def download(self):
-        print(f"Input URL: {self.movie_url}")
-        print(f"Saving to: {self.target_download_dir or os.getcwd()}")
+        logger.info(f"Input URL: {self.movie_url}")
+        logger.info(f"Saving to: {self.target_download_dir or os.getcwd()}")
         if self.scene_padding:
             if self.scene_n:
-                print(f"Scene padding: {self.scene_padding} seconds")
+                logger.info(f"Scene padding: {self.scene_padding} seconds")
             else:
-                print(f"Downloading the full movie, scene padding will be ignored")
+                logger.info(f"Downloading the full movie, scene padding will be ignored")
         self._session_prep()
         self._scrape_info()
         self._construct_paths()
@@ -74,15 +76,15 @@ class Movie:
         self._parse_manifest()
         self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
         self.file_name += f" {self.target_height}p"
-        print(self.file_name)
+        logger.info(self.file_name)
         self._calcualte_scenes_boundaries()
         self._ffmpeg_check()
         self._download_segments()
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
         self._temp_folder_cleanup()
-        print("All done!")
-        print(self.file_name + ".mp4")
+        logger.info("All done!")
+        logger.info(self.file_name + ".mp4")
 
     def _session_prep(self):
         # https://stackoverflow.com/a/47475019/14931505
@@ -131,7 +133,7 @@ class Movie:
                 self._get_covers(self.cover_front, 'cover-a')
                 self._get_covers(self.cover_back, 'cover-b')
             except Exception as e:
-                print("Error fetching cover urls: ", e)
+                logger.warning("Error fetching cover urls: ", e)
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
@@ -151,7 +153,7 @@ class Movie:
         os.utime(output, (now, modified))
 
         if os.path.isfile(output):
-            print("Saved cover:", output)
+            logger.info("Saved cover:", output)
 
     def _calcualte_scenes_boundaries(self):
         self.scenes_boundaries = []
@@ -217,7 +219,7 @@ class Movie:
 
             # Write the audio bytes to the stdin of the FFmpeg process
             _, stderr_data = process.communicate(input=audio_bytes)
-            # print(stderr_data.decode())
+            # logger.info(stderr_data.decode())
 
             # Check if FFmpeg found any errors
             if b"Multiple frames in a packet" in stderr_data or b"Error" in stderr_data:
@@ -232,7 +234,7 @@ class Movie:
             if not ffmpeg_error_check(seg_0 + seg_data):  # type: ignore
                 return stream_id
             else:
-                print("Skipping bad audio stream")
+                logger.info("Skipping bad audio stream")
 
     def _parse_manifest(self):
         # Parse the XML manifest
@@ -240,10 +242,10 @@ class Movie:
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams_by_height(video_adaptation_sets)
-        print("Available video streams:")
+        logger.info("Available video streams:")
         for video_stream in video_streams:
-            print(video_stream[1], end=" ")
-        print()
+            logger.info(video_stream[1], end=" ")
+        logger.info("")
         self.audio_stream_id = self._find_best_good_audio_stream(video_streams)
         if self.target_height == 0:
             self.video_stream_id, self.target_height = video_streams[0]
@@ -263,7 +265,7 @@ class Movie:
         # number of segments calc
         total_number_of_segments = total_duration_seconds / self.segment_duration
         total_number_of_segments = math.ceil(total_number_of_segments)
-        print(f"total segments: {total_number_of_segments}")
+        logger.info(f"total segments: {total_number_of_segments}")
         return total_number_of_segments
 
     def _temp_folder_cleanup(self):
@@ -284,7 +286,7 @@ class Movie:
         if not self.end_segment:
             self.end_segment = self.total_number_of_segments
 
-        print(f"Downloading segments {self.start_segment} - {self.end_segment}")
+        logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
 
         for stream_type in self.stream_types:
             stream_id = ""
@@ -299,8 +301,9 @@ class Movie:
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             # using tqdm object so we can manipulate progress
             # and display it as segment 0 was part of the loop
-            download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc)
-            download_bar.update(1)
+            if not self.is_silent:
+                download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc)
+                download_bar.update() # increment by 1
             for current_segment_number in segments_to_download:
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
@@ -309,13 +312,15 @@ class Movie:
                     self._get_manifest_content()
                     if not self._download_segment(stream_type, current_segment_number, stream_id):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
-                download_bar.update(1)
-            download_bar.close()
+                if not self.is_silent:
+                    download_bar.update()
+            if not self.is_silent:
+                download_bar.close()
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
         segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
         segment_path = os.path.join(self.download_dir_path, segment_file_name)
-        if os.path.exists(segment_path) and not self.overwrite_existing_segments:
+        if os.path.exists(segment_path) and not self.overwrite_existing_files:
             if return_bytes:
                 with open(segment_path, 'rb') as segment_file:
                     content = segment_file.read()
@@ -348,7 +353,8 @@ class Movie:
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
         output_path = os.path.join(self.target_download_dir, f"{self.file_name}.mp4")
-        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -c copy "{output_path}" -loglevel warning'
+        overwrite = "-y" if self.overwrite_existing_files else ""
+        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" {overwrite} -c copy "{output_path}" -loglevel warning'
 
         if self.ffmpeg_dir:
             out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
@@ -357,15 +363,23 @@ class Movie:
         assert out.returncode == 0
 
     def _join_files(self, files, output_path, tqdm_desc):
+        if not self.is_silent:
+            join_bar = tqdm(files, desc=f"Joining {tqdm_desc}")
         with open(output_path, 'wb') as f:
-            for segment_file_path in tqdm(files, desc=f"Joining {tqdm_desc}"):
+            for segment_file_path in files:
                 with open(segment_file_path, 'rb') as segment_file:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
+                    if not self.is_silent: join_bar.update()
+        if not self.is_silent: join_bar.close()
         if not self.keep_segments_after_download:
-            for segment_file_path in tqdm(files, desc=f"Deleting {tqdm_desc}"):
+            if not self.is_silent:
+                delete_bar = tqdm(files, desc=f"Deleting {tqdm_desc}")
+            for segment_file_path in files:
                 os.remove(segment_file_path)
+                if not self.is_silent: delete_bar.update()
+            if not self.is_silent: delete_bar.close()
 
     def _delete_joined_streams(self):
         if os.path.exists(self.audio_stream_path):
@@ -384,8 +398,6 @@ class Movie:
         for num in range(self.start_segment, self.end_segment + 1):
             audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
             video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
-        # video_files = sorted(video_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
-        # audio_files = sorted(audio_files, key=lambda i: int(os.path.splitext(os.path.basename(i))[0].split("_")[1]))
 
         # concat all audio segment data into a single file
         self._join_files(audio_files, self.audio_stream_path, tqdm_desc='audio segments')
@@ -404,9 +416,10 @@ def download_movie(url):
         start_segment=args.start_segment,
         end_segment=args.end_segment,
         download_covers=args.covers,
-        overwrite_existing_segments=args.overwrite,
+        overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
-        scene_padding=args.padding
+        scene_padding=args.padding,
+        is_silent = True if logger.getEffectiveLevel() == logging.ERROR else False
     )
     movie_instance.download()
 
@@ -415,7 +428,7 @@ def worker(q):
     while True:
         value = q.get()
         # subtract 1 because the main thread is included
-        print(f"Total threads {threading.active_count() - 1} | Processing {value}")
+        logger.info(f"Total threads {threading.active_count() - 1} | Processing {value}")
         download_movie(value)
         q.task_done()
 
@@ -433,7 +446,7 @@ def convert_line_endings(file_path):
         content = content.replace(WINDOWS_LINE_ENDING, UNIX_LINE_ENDING)
         with open(file_path, 'wb') as open_file:
             open_file.write(content)
-        print('Converted list.txt to unix line endings, important for linux processing')
+        logger.info('Converted list.txt to unix line endings, important for linux processing')
 
 
 if __name__ == "__main__":
@@ -449,11 +462,17 @@ if __name__ == "__main__":
     parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
     parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments if already present")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments and the end result file, if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     parser.add_argument("-p", "--padding", type=int, help="Set padding for scenes boundaries in seconds")
+    parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
     args = parser.parse_args()
+
+    log_level = logging.ERROR if args.silent else logging.INFO
+
+    logging.basicConfig(level=log_level)  # Set the initial logging level
+    logger = logging.getLogger(__name__)  # Create a logger instance for the script
 
     q = queue.Queue()
     # validate the url
@@ -470,7 +489,7 @@ if __name__ == "__main__":
         while ("" in urllist):  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
-        if args.threads:
+        if args.threads and logger.getEffectiveLevel() != logging.ERROR:
             while True:
                 answer = input('''
 \033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
@@ -501,6 +520,6 @@ Are you sure you want to continue? (Y/n) ''').casefold()
         q.join()  # wait for all the threads to finish, then continue below
 
         if q.empty():
-            print("Download queue complete")
+            logger.info("Download queue complete")
     else:
-        print("Invalid URL or list.txt not passed")
+        logger.error("Invalid URL or list.txt not passed")
