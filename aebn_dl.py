@@ -41,10 +41,11 @@ If you have pip (normally installed with python), run this command in a terminal
 
 class Movie:
     def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
-                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False):
+                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False, lock_resolution=False):
 
         self.movie_url = url
         self.target_height = target_height
+        self.lock_resolution = lock_resolution
         self.start_segment = start_segment
         self.end_segment = end_segment
         self.ffmpeg_dir = ffmpeg_dir
@@ -251,8 +252,10 @@ class Movie:
             self.video_stream_id, self.target_height = video_streams[-1]
         elif self.target_height:
             self.video_stream_id = next((sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
-            if not self.video_stream_id:
+            if not self.video_stream_id and self.lock_resolution:
                 raise RuntimeError(f"Target video resolution height {self.target_height} not found")
+            else:
+                self.video_stream_id, self.target_height = next((sublist for sublist in reversed(video_streams) if sublist[1] <= self.target_height), None)
 
     def _total_number_of_segments_calc(self, root, total_duration_seconds):
         # Get timescale
@@ -301,7 +304,7 @@ class Movie:
             # and display it as segment 0 was part of the loop
             if not self.is_silent:
                 download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc)
-                download_bar.update() # increment by 1
+                download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
                 if not self._download_segment(stream_type, current_segment_number, stream_id):
                     # segment download error, trying again with a new manifest
@@ -369,15 +372,19 @@ class Movie:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
-                    if not self.is_silent: join_bar.update()
-        if not self.is_silent: join_bar.close()
+                    if not self.is_silent:
+                        join_bar.update()
+        if not self.is_silent:
+            join_bar.close()
         if not self.keep_segments_after_download:
             if not self.is_silent:
                 delete_bar = tqdm(files, desc=f"Deleting {tqdm_desc}")
             for segment_file_path in files:
                 os.remove(segment_file_path)
-                if not self.is_silent: delete_bar.update()
-            if not self.is_silent: delete_bar.close()
+                if not self.is_silent:
+                    delete_bar.update()
+            if not self.is_silent:
+                delete_bar.close()
 
     def _delete_joined_streams(self):
         if os.path.exists(self.audio_stream_path):
@@ -417,7 +424,8 @@ def download_movie(url):
         overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
         scene_padding=args.padding,
-        is_silent = True if logger.getEffectiveLevel() == logging.ERROR else False
+        lock_resolution=args.lock_resolution,
+        is_silent=True if logger.getEffectiveLevel() == logging.ERROR else False
     )
     movie_instance.download()
 
@@ -454,7 +462,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
     parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
-    parser.add_argument("-r", "--resolution", type=int, default=1, help="Desired video resolution by pixel height. Use 0 to select the lowest available resolution. (default: highest available)")
+    parser.add_argument("-r", "--resolution", type=int, default=1,
+                        help="Desired video resolution by pixel height. "
+                        "If not found, the nearest lower resolution will be used. "
+                        "Use 0 to select the lowest available resolution. "
+                        "(default: highest available)")
+    parser.add_argument("-lr", "--lock_resolution", action="store_true", help="Exit with an error if the target resolution not found")
     parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
     parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
     parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
