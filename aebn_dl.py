@@ -242,10 +242,8 @@ class Movie:
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_video_streams_by_height(video_adaptation_sets)
-        logger.info("Available video streams:")
-        for video_stream in video_streams:
-            logger.info(video_stream[1], end=" ")
-        logger.info("")
+        streams_res = " ".join(str(video_stream[1]) for video_stream in video_streams)
+        logger.info("Available video streams: %s", streams_res)
         self.audio_stream_id = self._find_best_good_audio_stream(video_streams)
         if self.target_height == 0:
             self.video_stream_id, self.target_height = video_streams[0]
@@ -471,7 +469,7 @@ if __name__ == "__main__":
 
     log_level = logging.ERROR if args.silent else logging.INFO
 
-    logging.basicConfig(level=log_level)  # Set the initial logging level
+    logging.basicConfig(level=log_level, format='%(message)s')  # Set the initial logging level
     logger = logging.getLogger(__name__)  # Create a logger instance for the script
 
     q = queue.Queue()
