@@ -56,14 +56,11 @@ class Movie:
         self.scene_padding = scene_padding
         self.stream_types = ["a", "v"]
         self.is_silent = is_silent
-        if target_download_dir:
-            self.target_download_dir = target_download_dir
-        else:
-            self.target_download_dir = os.getcwd()
+        self.target_download_dir = target_download_dir or os.getcwd()
 
     def download(self):
         logger.info(f"Input URL: {self.movie_url}")
-        logger.info(f"Saving to: {self.target_download_dir or os.getcwd()}")
+        logger.info(f"Saving to: {self.target_download_dir}")
         if self.scene_padding:
             if self.scene_n:
                 logger.info(f"Scene padding: {self.scene_padding} seconds")
@@ -364,10 +361,8 @@ class Movie:
         overwrite = "-y" if self.overwrite_existing_files else ""
         cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" {overwrite} -c copy "{output_path}" -loglevel warning'
 
-        if self.ffmpeg_dir:
-            out = subprocess.run(cmd, shell=True, cwd=self.ffmpeg_dir)
-        else:
-            out = subprocess.run(cmd, shell=True)
+        cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
+        out = subprocess.run(cmd, shell=True, cwd=cwd)
         assert out.returncode == 0
 
     def _join_files(self, files, output_path, tqdm_desc):
@@ -427,7 +422,7 @@ def download_movie(url):
         keep_segments_after_download=args.keep,
         scene_padding=args.padding,
         lock_resolution=args.lock_resolution,
-        is_silent=True if logger.getEffectiveLevel() == logging.ERROR else False
+        is_silent=args.is_silent
     )
     movie_instance.download()
 
