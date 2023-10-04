@@ -424,16 +424,16 @@ def download_movie(url):
         url,
         output_dir=args.output_dir,
         work_dir=args.work_dir,
-        ffmpeg_dir=args.ffmpeg,
         target_height=args.resolution,
+        resolution_force=args.resolution_force,
+        ffmpeg_dir=args.ffmpeg,
         scene_n=args.scene,
+        scene_padding=args.scene_padding,
         start_segment=args.start_segment,
         end_segment=args.end_segment,
         download_covers=args.covers,
         overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
-        scene_padding=args.scene_padding,
-        resolution_force=args.resolution_force,
         is_silent=args.silent
     )
     movie_instance.download()
@@ -470,8 +470,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-od", "--output_dir", type=str, help="Specify an output directory")
-    parser.add_argument("-wd", "--work_dir", type=str, help="Specify a work diretory to store downloaded temporary segments in")
+    parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
+    parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
     parser.add_argument("-r", "--resolution", type=int, default=1,
                         help="Desired video resolution by pixel height. "
                         "If not found, the nearest lower resolution will be used. "
@@ -484,10 +484,10 @@ if __name__ == "__main__":
     parser.add_argument("-ss", "-start", "--start-segment", type=int, help="Specify the start segment")
     parser.add_argument("-es", "-end", "--end-segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
+    parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
+    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     args = parser.parse_args()
 
     log_level = logging.ERROR if args.silent else logging.INFO
