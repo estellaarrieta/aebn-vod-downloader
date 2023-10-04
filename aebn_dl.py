@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 from urllib3.util.retry import Retry
@@ -40,12 +41,15 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, target_download_dir,
-                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False, lock_resolution=False):
+    def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, output_dir, work_dir,
+                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
+                 resolution_force=False):
 
         self.movie_url = url
+        self.output_dir = output_dir or os.getcwd()
+        self.work_dir = work_dir or os.getcwd()
         self.target_height = target_height
-        self.lock_resolution = lock_resolution
+        self.resolution_force = resolution_force
         self.start_segment = start_segment
         self.end_segment = end_segment
         self.ffmpeg_dir = ffmpeg_dir
@@ -56,11 +60,11 @@ class Movie:
         self.scene_padding = scene_padding
         self.stream_types = ["a", "v"]
         self.is_silent = is_silent
-        self.target_download_dir = target_download_dir or os.getcwd()
 
     def download(self):
         logger.info(f"Input URL: {self.movie_url}")
-        logger.info(f"Saving to: {self.target_download_dir}")
+        logger.info(f"Output dir: {self.output_dir}")
+        logger.info(f"Work dir: {self.work_dir}")
         if self.scene_padding:
             if self.scene_n:
                 logger.info(f"Scene padding: {self.scene_padding} seconds")
@@ -104,12 +108,16 @@ class Movie:
         self.session.headers["User-Agent"] = random_user_agent
 
     def _construct_paths(self):
-        if not os.path.exists(self.target_download_dir):
-            os.makedirs(self.target_download_dir)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
-        self.download_dir_path = os.path.join(self.target_download_dir, self.movie_id)
-        self.audio_stream_path = os.path.join(self.download_dir_path, f"a_{self.movie_id}.mp4")
-        self.video_stream_path = os.path.join(self.download_dir_path, f"v_{self.movie_id}.mp4")
+        self.work_dir = os.path.join(self.work_dir, self.movie_id)
+
+        if not os.path.exists(self.work_dir):
+            os.makedirs(self.work_dir)
+
+        self.audio_stream_path = os.path.join(self.work_dir, f"a_{self.movie_id}.mp4")
+        self.video_stream_path = os.path.join(self.work_dir, f"v_{self.movie_id}.mp4")
 
     def _remove_chars(self, text):
         for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
@@ -172,7 +180,7 @@ class Movie:
                 start_timing = start_timing_padded if start_timing_padded >= 0 else 0
                 end_timing_padded = end_timing + self.scene_padding
                 end_timing = end_timing_padded if end_timing_padded <= self.total_duration_seconds else self.total_duration_seconds
-            start_segment = math.ceil(int(start_timing) / self.segment_duration)
+            start_segment = math.floor(int(start_timing) / self.segment_duration)
             end_segment = math.ceil(int(end_timing) / self.segment_duration)
             self.scenes_boundaries.append([start_segment, end_segment])
 
@@ -241,7 +249,8 @@ class Movie:
             if not ffmpeg_error_check(seg_0 + seg_data):  # type: ignore
                 return stream_id
             else:
-                logger.info("Skipping bad audio stream")
+                # logger.info("Skipping bad audio stream")
+                pass
 
     def _parse_manifest(self):
         # Parse the XML manifest
@@ -258,7 +267,7 @@ class Movie:
             self.video_stream_id, self.target_height = video_streams[-1]
         elif self.target_height:
             self.video_stream_id = next((sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
-            if not self.video_stream_id and self.lock_resolution:
+            if not self.video_stream_id and self.resolution_force:
                 raise RuntimeError(f"Target video resolution height {self.target_height} not found")
             else:
                 self.video_stream_id, self.target_height = next((sublist for sublist in reversed(video_streams) if sublist[1] <= self.target_height), None)
@@ -272,14 +281,14 @@ class Movie:
         # number of segments calc
         total_number_of_segments = total_duration_seconds / self.segment_duration
         total_number_of_segments = math.ceil(total_number_of_segments)
-        logger.info(f"total segments: {total_number_of_segments}")
+        logger.info(f"Total segments: {total_number_of_segments}")
         return total_number_of_segments
 
     def _temp_folder_cleanup(self):
         if not self.keep_segments_after_download:
             self._delete_joined_streams()
-        if not os.listdir(self.download_dir_path):
-            os.rmdir(self.download_dir_path)
+        if not os.listdir(self.work_dir):
+            os.rmdir(self.work_dir)
 
     def _download_segments(self):
         if self.scene_n:
@@ -324,7 +333,7 @@ class Movie:
 
     def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
         segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
-        segment_path = os.path.join(self.download_dir_path, segment_file_name)
+        segment_path = os.path.join(self.work_dir, segment_file_name)
         if os.path.exists(segment_path) and not self.overwrite_existing_files:
             if return_bytes:
                 with open(segment_path, 'rb') as segment_file:
@@ -350,20 +359,22 @@ class Movie:
             return True
         if response.status_code >= 403 or not response.content:
             return False
-        if not os.path.exists(self.download_dir_path):
-            os.mkdir(self.download_dir_path)
+        if not os.path.exists(self.work_dir):
+            os.mkdir(self.work_dir)
         with open(segment_path, 'wb') as f:
             f.write(response.content)
         return True
 
     def _ffmpeg_mux_video_audio(self, video_path, audio_path):
-        output_path = os.path.join(self.target_download_dir, f"{self.file_name}.mp4")
-        overwrite = "-y" if self.overwrite_existing_files else ""
-        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" {overwrite} -c copy "{output_path}" -loglevel warning'
+        output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
+        cmd = f'ffmpeg -i "{video_path}" -i "{audio_path}" -y -c copy "{output_path}" -loglevel warning'
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
         out = subprocess.run(cmd, shell=True, cwd=cwd)
         assert out.returncode == 0
+
+        output_path_uri = Path(output_path).as_uri()
+        logger.info(output_path_uri)
 
     def _join_files(self, files, output_path, tqdm_desc):
         join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
@@ -395,11 +406,11 @@ class Movie:
 
         audio_files = []
         video_files = []
-        audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_0.mp4"))
-        video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_0.mp4"))
+        audio_files.append(os.path.join(self.work_dir, f"a_{self.audio_stream_id}_0.mp4"))
+        video_files.append(os.path.join(self.work_dir, f"v_{self.video_stream_id}_0.mp4"))
         for num in range(self.start_segment, self.end_segment + 1):
-            audio_files.append(os.path.join(self.download_dir_path, f"a_{self.audio_stream_id}_{num}.mp4"))
-            video_files.append(os.path.join(self.download_dir_path, f"v_{self.video_stream_id}_{num}.mp4"))
+            audio_files.append(os.path.join(self.work_dir, f"a_{self.audio_stream_id}_{num}.mp4"))
+            video_files.append(os.path.join(self.work_dir, f"v_{self.video_stream_id}_{num}.mp4"))
 
         # concat all audio segment data into a single file
         self._join_files(audio_files, self.audio_stream_path, tqdm_desc='audio segments')
@@ -411,7 +422,8 @@ class Movie:
 def download_movie(url):
     movie_instance = Movie(
         url,
-        target_download_dir=args.download_dir,
+        output_dir=args.output_dir,
+        work_dir=args.work_dir,
         ffmpeg_dir=args.ffmpeg,
         target_height=args.resolution,
         scene_n=args.scene,
@@ -420,9 +432,9 @@ def download_movie(url):
         download_covers=args.covers,
         overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
-        scene_padding=args.padding,
-        lock_resolution=args.lock_resolution,
-        is_silent=args.is_silent
+        scene_padding=args.scene_padding,
+        resolution_force=args.resolution_force,
+        is_silent=args.silent
     )
     movie_instance.download()
 
@@ -458,22 +470,23 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-d", "--download_dir", type=str, help="Specify a download directory")
+    parser.add_argument("-od", "--output_dir", type=str, help="Specify an output directory")
+    parser.add_argument("-wd", "--work_dir", type=str, help="Specify a work diretory to store downloaded temporary segments in")
     parser.add_argument("-r", "--resolution", type=int, default=1,
                         help="Desired video resolution by pixel height. "
                         "If not found, the nearest lower resolution will be used. "
                         "Use 0 to select the lowest available resolution. "
                         "(default: highest available)")
-    parser.add_argument("-lr", "--lock_resolution", action="store_true", help="Exit with an error if the target resolution not found")
+    parser.add_argument("-rf", "--resolution-force", action="store_true", help="If the target resolution not available, exit with an error")
     parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
     parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
-    parser.add_argument("-start", "--start_segment", type=int, help="Specify the start segment")
-    parser.add_argument("-end", "--end_segment", type=int, help="Specify the end segment")
+    parser.add_argument("-p", "--scene-padding", type=int, help="Set padding for scenes boundaries in seconds")
+    parser.add_argument("-ss", "-start", "--start-segment", type=int, help="Specify the start segment")
+    parser.add_argument("-es", "-end", "--end-segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
-    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments and the end result file, if already present")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
-    parser.add_argument("-p", "--padding", type=int, help="Set padding for scenes boundaries in seconds")
     parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
     args = parser.parse_args()
 
