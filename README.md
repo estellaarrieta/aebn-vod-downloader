@@ -37,17 +37,21 @@ It will download the videos in parallel with a default of 5 threads (concurrent 
 
 You can customize the behavior of the script by passing different arguments when running it. The available arguments are:
 
-| Short argument | Long argument| Description |
+| Short Argument | Long Argument | Description |
 | --- | --- | --- |
-|`-h` | `--help` | Show this help message and exit |
-|url or list.txt file | | The URL of the movie to download (required) |
-|`-d` | `--download_dir DOWNLOAD_DIR` | Specify a target download directory (default: current directory) |
-|`-r RESOLUTION` | `--resolution RESOLUTION` | Desired video resolution by pixel height. Use 0 to select the lowest available resolution (default: 1, highest available). For example, to select the 720p resolution, use `-r 720` |
-|`-f FFMPEG` | `--ffmpeg FFMPEG` | Specify the location of your ffmpeg directory |
-|`-sn SCENE` | `--scene SCENE` | Download a single scene using the relevant scene number on AEBN |
-|`-start SCENE_START` | `--scene_start SCENE_START` | Specify the start segment |
-|`-end SCENE_END` | `--scene_end SCENE_END` | Specify the end segment |
-|`-c` | `--covers` | Download front and back covers |
-|`-o` | `--overwrite` | Overwrite existing audio and video segments if already present |
-|`-k` | `--keep` | Keep audio and video segments after download |
-|`-t` | `--threads` | Threads for concurrent downloads (default=5) |
+| `-h` | `--help` | Show this help message and exit |
+| URL or list.txt file | | The URL of the movie to download (required) |
+| `-o` | `--output_dir` | Specify the output directory (default: current directory) |
+| `-w` | `--work_dir` | Specify the work directory to store downloaded temporary segments in (default: current directory)|
+| `-r` | `--resolution` | Desired video resolution by pixel height. If not found, the nearest lower resolution will be used. Use 0 to select the lowest available resolution (default: 1, highest available). For example, to select 720p resolution, use `-r 720` |
+| `-rf` | `--resolution-force` | If the target resolution is not available, exit with an error |
+| `-f` | `--ffmpeg` | Specify the location of your FFmpeg directory |
+| `-sn` | `--scene` | Download a single scene using the relevant scene number on AEBN |
+| `-p` | `--scene-padding` | Set padding for scene boundaries in seconds |
+| `-ss` or `-start` | `--start-segment` | Specify the start segment |
+| `-es` or `-end` | `--end-segment` | Specify the end segment |
+| `-c` | `--covers` | Download front and back covers |
+| `-ow` | `--overwrite` | Overwrite existing audio and video segments if already present |
+| `-k` | `--keep` | Keep audio and video segments after downloading |
+| `-s` | `--silent` | Run the script in silent mode |
+| `-t` | `--threads` | Threads for concurrent downloads (default: 5) |
