@@ -76,6 +76,7 @@ class Movie:
             logger.info(f"Target resolution: Highest")
         elif self.target_height == 0:
             logger.info(f"Target resolution: Lowest")
+        self._ffmpeg_check()
         self._session_prep()
         self._scrape_info()
         self._construct_paths()
@@ -85,8 +86,8 @@ class Movie:
         self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
         self.file_name += f" {self.target_height}p"
         logger.info(self.file_name)
-        self._calcualte_scenes_boundaries()
-        self._ffmpeg_check()
+        if self.scene_n:
+            self._calcualte_scenes_boundaries()
         self._download_segments()
         self._join_segments()
         self._ffmpeg_mux_video_audio(self.video_stream_path, self.audio_stream_path)
@@ -217,12 +218,10 @@ class Movie:
         self.manifest_url = content["url"]
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
 
-    def _sort_video_streams_by_height(self, video_stream_elements):
-        video_streams = []
-        for element in video_stream_elements:
-            video_streams.append([element.get('id'), int(element.get('height'))])
-        video_streams = sorted(video_streams, key=lambda x: x[1])
-        return video_streams
+    def _sort_streams_by_video_height(self, video_stream_elements):
+        video_streams = [(element.get('id'), int(element.get('height'))) for element in video_stream_elements]
+        sorted_video_streams = sorted(video_streams, key=lambda video_stream: video_stream[1])
+        return sorted_video_streams
 
     def _find_best_good_audio_stream(self, video_streams):
         # some audio streams can be corrupted, using ffmpeg to test
@@ -257,9 +256,9 @@ class Movie:
         root = ET.fromstring(self.manifest_content, None)
         self.total_number_of_segments = self._total_number_of_segments_calc(root, self.total_duration_seconds)
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
-        video_streams = self._sort_video_streams_by_height(video_adaptation_sets)
-        streams_res = " ".join(str(video_stream[1]) for video_stream in video_streams)
-        logger.info("Available video streams: %s", streams_res)
+        video_streams = self._sort_streams_by_video_height(video_adaptation_sets)
+        streams_res_string = " ".join(str(video_stream[1]) for video_stream in video_streams)
+        logger.info("Available video streams: %s", streams_res_string)
         self.audio_stream_id = self._find_best_good_audio_stream(video_streams)
         if self.target_height == 0:
             self.video_stream_id, self.target_height = video_streams[0]
