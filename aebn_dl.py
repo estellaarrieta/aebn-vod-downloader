@@ -241,11 +241,11 @@ class Movie:
             else:
                 return False  # No errors found
         for stream_id, _ in reversed(video_streams):
-            seg_0 = self._download_segment("a", 0, stream_id, return_bytes=True)
+            seg_init = self._download_segment("a", stream_id, return_bytes=True)
             # grab audio segment from the middle of the stream
             data_segment_number = int(self.total_number_of_segments / 2)
-            seg_data = self._download_segment("a", data_segment_number, stream_id, return_bytes=True)
-            if not ffmpeg_error_check(seg_0 + seg_data):  # type: ignore
+            seg_data = self._download_segment("a", stream_id, return_bytes=True, current_segment_number=data_segment_number)
+            if not ffmpeg_error_check(seg_init + seg_data):  # type: ignore
                 return stream_id
             else:
                 # logger.info("Skipping bad audio stream")
@@ -297,7 +297,7 @@ class Movie:
                 sys.exit(f"Scene {self.scene_n} not found!")
 
         if not self.start_segment:
-            self.start_segment = 1
+            self.start_segment = 0
         if not self.end_segment:
             self.end_segment = self.total_number_of_segments
 
@@ -312,27 +312,33 @@ class Movie:
             elif stream_type == "v":
                 stream_id = self.video_stream_id
                 tqdm_desc = "Video download"
-            self._download_segment(stream_type, 0, stream_id)
-            segments_to_download = range(self.start_segment, self.end_segment + 1)
-            # using tqdm object so we can manipulate progress
-            # and display it as segment 0 was part of the loop
 
+            # downloading init segment
+            self._download_segment(stream_type, stream_id)
+
+            # using tqdm object so we can manipulate progress
+            # and display it as init segment was part of the loop
+            segments_to_download = range(self.start_segment, self.end_segment + 1)
             download_bar = tqdm(total=len(segments_to_download) + 1, desc=tqdm_desc, disable=self.is_silent)
             download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
-                if not self._download_segment(stream_type, current_segment_number, stream_id):
+                if not self._download_segment(stream_type, stream_id, current_segment_number=current_segment_number):
                     # segment download error, trying again with a new manifest
                     self._session_prep()
                     self._get_new_manifest_url()
                     self._get_manifest_content()
-                    if not self._download_segment(stream_type, current_segment_number, stream_id):
+                    if not self._download_segment(stream_type, stream_id, current_segment_number=current_segment_number):
                         sys.exit(f"{stream_type}_{stream_id}_{current_segment_number} download error")
                 download_bar.update()
             download_bar.close()
 
-    def _download_segment(self, segment_type, current_segment_number, stream_id, return_bytes=False):
-        segment_file_name = f"{segment_type}_{stream_id}_{current_segment_number}.mp4"
-        segment_path = os.path.join(self.work_dir, segment_file_name)
+    def _download_segment(self, stream_type, stream_id, return_bytes=False, current_segment_number=None):
+        if isinstance(current_segment_number, int):
+            segment_name = f"{stream_type}_{stream_id}_{current_segment_number}"
+        else:
+            segment_name = f"{stream_type}i_{stream_id}"
+        segment_url = f"{self.base_stream_url}/{segment_name}.mp4d"
+        segment_path = os.path.join(self.work_dir, f"{segment_name}.mp4")
         if os.path.exists(segment_path) and not self.overwrite_existing_files:
             if return_bytes:
                 with open(segment_path, 'rb') as segment_file:
@@ -340,10 +346,6 @@ class Movie:
                     segment_file.close()
                     return content
             return True
-        if current_segment_number == 0:
-            segment_url = f"{self.base_stream_url}/{segment_type}i_{stream_id}.mp4d"
-        else:
-            segment_url = f"{self.base_stream_url}/{segment_type}_{stream_id}_{current_segment_number}.mp4d"
         try:
             response = self.session.get(segment_url)
         except:
@@ -352,8 +354,8 @@ class Movie:
             return response.content
 
         if response.status_code == 404 and current_segment_number == self.total_number_of_segments:
-            # just skip if the last segment does not exists
-            # segment calc returns a rouded up float which sometimes bigger that the actual number of segments
+            # just skip if the last segment does not exist
+            # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
             self.end_segment -= 1
             return True
         if response.status_code >= 403 or not response.content:
@@ -405,8 +407,8 @@ class Movie:
 
         audio_files = []
         video_files = []
-        audio_files.append(os.path.join(self.work_dir, f"a_{self.audio_stream_id}_0.mp4"))
-        video_files.append(os.path.join(self.work_dir, f"v_{self.video_stream_id}_0.mp4"))
+        audio_files.append(os.path.join(self.work_dir, f"ai_{self.audio_stream_id}.mp4"))
+        video_files.append(os.path.join(self.work_dir, f"vi_{self.video_stream_id}.mp4"))
         for num in range(self.start_segment, self.end_segment + 1):
             audio_files.append(os.path.join(self.work_dir, f"a_{self.audio_stream_id}_{num}.mp4"))
             video_files.append(os.path.join(self.work_dir, f"v_{self.video_stream_id}_{num}.mp4"))
