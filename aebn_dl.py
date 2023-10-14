@@ -43,13 +43,14 @@ If you have pip (normally installed with python), run this command in a terminal
 class Movie:
     def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, output_dir, work_dir,
                  scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
-                 resolution_force=False):
+                 resolution_force=False, include_performer_names=False):
 
         self.movie_url = url
         self.output_dir = output_dir or os.getcwd()
         self.work_dir = work_dir or os.getcwd()
         self.target_height = target_height
         self.resolution_force = resolution_force
+        self.include_performer_names = include_performer_names
         self.start_segment = start_segment
         self.end_segment = end_segment
         self.ffmpeg_dir = ffmpeg_dir
@@ -84,6 +85,7 @@ class Movie:
         self._get_manifest_content()
         self._parse_manifest()
         self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
+        self.file_name += " " + ", ".join(self.performers) if self.include_performer_names else ""
         self.file_name += f" {self.target_height}p"
         logger.info(self.file_name)
         if self.scene_n:
@@ -137,6 +139,11 @@ class Movie:
         self.studio_name = self._remove_chars(self.studio_name)
         self.movie_name = self._remove_chars(self.movie_name)
         self.file_name = f"{self.studio_name} - {self.movie_name}"
+        if self.include_performer_names:
+            if self.scene_n:
+                self.performers = content.xpath(f'(//li[@class="dts-scene-strip-stars"])[{self.scene_n}]//a/text()')
+            else:
+                self.performers = content.xpath(f'//section[@id="dtsPanelStarsDetailMovie"]//a/@title')
         if self.download_covers:
             try:
                 self.cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
@@ -427,6 +434,7 @@ def download_movie(url):
         work_dir=args.work_dir,
         target_height=args.resolution,
         resolution_force=args.resolution_force,
+        include_performer_names=args.include_performer_names,
         ffmpeg_dir=args.ffmpeg,
         scene_n=args.scene,
         scene_padding=args.scene_padding,
@@ -479,6 +487,7 @@ if __name__ == "__main__":
                         "Use 0 to select the lowest available resolution. "
                         "(default: highest available)")
     parser.add_argument("-rf", "--resolution-force", action="store_true", help="If the target resolution not available, exit with an error")
+    parser.add_argument("-pfn", "--include-performer-names", action="store_true", help="Include performer names in the output filename")
     parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
     parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
     parser.add_argument("-p", "--scene-padding", type=int, help="Set padding for scenes boundaries in seconds")
