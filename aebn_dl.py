@@ -287,7 +287,7 @@ class Movie:
         # number of segments calc
         total_number_of_segments = total_duration_seconds / self.segment_duration
         total_number_of_segments = math.ceil(total_number_of_segments)
-        logger.info(f"Total segments: {total_number_of_segments}")
+        logger.info(f"Total segments: {total_number_of_segments+1}")
         return total_number_of_segments
 
     def _temp_folder_cleanup(self):
