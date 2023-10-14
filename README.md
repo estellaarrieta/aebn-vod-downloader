@@ -45,6 +45,7 @@ You can customize the behavior of the script by passing different arguments when
 | `-w` | `--work_dir` | Specify the work directory to store downloaded temporary segments in (default: current directory)|
 | `-r` | `--resolution` | Desired video resolution by pixel height. If not found, the nearest lower resolution will be used. Use 0 to select the lowest available resolution (default: 1, highest available). For example, to select 720p resolution, use `-r 720` |
 | `-rf` | `--resolution-force` | If the target resolution is not available, exit with an error |
+| `-pfn` | `--include-performer-names` | Include performer names in the output filename |
 | `-f` | `--ffmpeg` | Specify the location of your FFmpeg directory |
 | `-sn` | `--scene` | Download a single scene using the relevant scene number on AEBN |
 | `-p` | `--scene-padding` | Set padding for scene boundaries in seconds |
