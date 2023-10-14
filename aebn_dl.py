@@ -106,9 +106,7 @@ class Movie:
         self.session.mount('https://', adapter)
 
         # setting random user agent
-        user_agent = UserAgent()
-        random_user_agent = user_agent.random
-        self.session.headers["User-Agent"] = random_user_agent
+        self.session.headers["User-Agent"] = UserAgent().random
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
