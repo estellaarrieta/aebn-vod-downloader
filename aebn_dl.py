@@ -155,7 +155,7 @@ class Movie:
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
-        output = os.path.join(self.target_download_dir, f'{self.file_name} {cover_name}{cover_extension}')
+        output = os.path.join(self.output_dir, f'{self.file_name} {cover_name}{cover_extension}')
 
         if os.path.isfile(output):
             return
