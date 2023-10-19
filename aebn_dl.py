@@ -504,7 +504,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
+    parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
     parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
     args = parser.parse_args()
