@@ -107,6 +107,9 @@ class Movie:
 
         # setting random user agent
         self.session.headers["User-Agent"] = UserAgent().random
+        user_agent = UserAgent()
+        random_user_agent = user_agent.random
+        self.session.headers["User-Agent"] = random_user_agent
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
@@ -317,7 +320,6 @@ class Movie:
             elif stream_type == "v":
                 stream_id = self.video_stream_id
                 tqdm_desc = "Video download"
-
             # downloading init segment
             self._download_segment(stream_type, stream_id)
 
@@ -412,6 +414,7 @@ class Movie:
 
         audio_files = []
         video_files = []
+
         audio_files.append(os.path.join(self.work_dir, f"ai_{self.audio_stream_id}.mp4"))
         video_files.append(os.path.join(self.work_dir, f"vi_{self.video_stream_id}.mp4"))
         for num in range(self.start_segment, self.end_segment + 1):
