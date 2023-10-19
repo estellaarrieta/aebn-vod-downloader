@@ -72,13 +72,13 @@ class Movie:
             if self.scene_n:
                 logger.info(f"Scene padding: {self.scene_padding} seconds")
             else:
-                logger.info(f"Downloading the full movie, scene padding will be ignored")
+                logger.info("Downloading the full movie, scene padding will be ignored")
         if self.target_height > 1:
             logger.info(f"Target resolution: {self.target_height}")
         elif self.target_height == 1:
-            logger.info(f"Target resolution: Highest")
+            logger.info("Target resolution: Highest")
         elif self.target_height == 0:
-            logger.info(f"Target resolution: Lowest")
+            logger.info("Target resolution: Lowest")
         self._ffmpeg_check()
         self._create_new_session()
         self._scrape_info()
@@ -240,8 +240,7 @@ class Movie:
         # Check if FFmpeg found any errors
         if b"Multiple frames in a packet" in stderr_data or b"Error" in stderr_data:
             return True  # Errors found
-        else:
-            return False  # No errors found
+        return False  # No errors found
 
     def _find_best_good_audio_stream(self, video_streams):
         # some audio streams can be corrupted, using ffmpeg to test
@@ -252,9 +251,8 @@ class Movie:
             data_segment_bytes = self._download_segment("a", stream_id, return_bytes=True, segment_number=data_segment_number)
             if not self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):  # type: ignore
                 return stream_id
-            else:
-                # logger.info("Skipping bad audio stream")
-                pass
+            # logger.info("Skipping bad audio stream")
+
 
     def _add_stream(self, stream_name, stream_id):
         stream_type = stream_name[0].lower()
@@ -364,7 +362,7 @@ class Movie:
             segment_name = f"{stream_type}i_{stream_id}"
 
         segment_url = f"{self.base_stream_url}/{segment_name}.mp4d"
-        segment_path = os.path.join(self.work_dir, f"{segment_name}.mp4")
+        segment_path = os.path.join(self.movie_work_dir, f"{segment_name}.mp4")
         if os.path.exists(segment_path) and not self.overwrite_existing_files:
             if return_bytes:
                 with open(segment_path, 'rb') as segment_file:
@@ -392,9 +390,9 @@ class Movie:
             f.write(response.content)
         return True
 
-    def _ffmpeg_mux_streams(self, stream_path1, stream_path_2):
+    def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
         output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
-        cmd = f'ffmpeg -i "{stream_path1}" -i "{stream_path_2}" -y -c copy "{output_path}" -loglevel warning'
+        cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}" -loglevel warning'
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
         out = subprocess.run(cmd, shell=True, cwd=cwd)
@@ -526,7 +524,7 @@ if __name__ == "__main__":
         file = open("list.txt")
         urllist = file.read().splitlines()  # remove the newlines
         file.close()
-        while ("" in urllist):  # remove empty strings from the list (resulted from empty lines)
+        while "" in urllist:  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
         if args.threads and logger.getEffectiveLevel() != logging.ERROR:
