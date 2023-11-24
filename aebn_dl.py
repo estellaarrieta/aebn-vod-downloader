@@ -517,7 +517,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
     parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
-    parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
+    parser.add_argument("--proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
     parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
     args = parser.parse_args()
 
