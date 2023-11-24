@@ -558,7 +558,8 @@ Are you sure you want to continue? (Y/n) ''').casefold()
                     sys.exit()
                 else:
                     print("Please enter y or n")
-        max_threads = args.threads or 5
+        default_max_threads = 5
+        max_threads = args.threads or len(urllist) if len(urllist)<default_max_threads else default_max_threads
         # print("Using max threads", max_threads)
 
         for x in range(max_threads):
