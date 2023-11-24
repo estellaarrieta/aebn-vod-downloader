@@ -57,5 +57,5 @@ You can customize the behavior of the script by passing different arguments when
 | `-v` |`--validate`| Validate segments as they download or found on disk|
 | `-s` | `--silent` | Run the script in silent mode |
 | `-t` | `--threads` | Threads for concurrent downloads (default: 5) |
-| - | `--proxy` | Proxy to use (format: `protocol://username:password@ip:port`) |
+| `-proxy` | - | Proxy to use (format: `protocol://username:password@ip:port`) |
 | `-pm` | `--proxy-metadata` | Use proxies for metadata only, and not for downloading. |
