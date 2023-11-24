@@ -42,7 +42,7 @@ If you have pip (normally installed with python), run this command in a terminal
 
 class Movie:
     def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, output_dir, work_dir,
-                 scene_padding, is_silent, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
+                 scene_padding, is_silent, proxy, proxy_metadata_only = False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
                  resolution_force=False, include_performer_names=False, semgent_validity_check=False):
 
         self.movie_url = url
@@ -62,9 +62,12 @@ class Movie:
         self.is_silent = is_silent
         self.semgent_validity_check = semgent_validity_check
         self.stream_map = []
+        self.proxy = proxy
+        self.proxy_metadata_only = proxy_metadata_only
 
     def download(self):
         logger.info(f"Input URL: {self.movie_url}")
+        logger.info(f"Proxy: {self.proxy}") if self.proxy else None
         logger.info(f"Output dir: {self.output_dir}")
         logger.info(f"Work dir: {self.work_dir}")
         logger.info(f"Segment validity check: {self.semgent_validity_check}")
@@ -106,6 +109,12 @@ class Movie:
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
+        if self.proxy:
+            proxies = {
+                "http": self.proxy,
+                "https": self.proxy
+            }
+        self.session.proxies = proxies
 
         # setting random user agent
         self.session.headers["User-Agent"] = UserAgent().random
@@ -253,7 +262,6 @@ class Movie:
                 return stream_id
             # logger.info("Skipping bad audio stream")
 
-
     def _add_stream(self, stream_name, stream_id):
         stream_type = stream_name[0].lower()
         new_stream = {
@@ -306,6 +314,8 @@ class Movie:
         os.rmdir(self.movie_work_dir) if not os.listdir(self.work_dir) else None
 
     def _download_segments(self):
+        if self.proxy and self.proxy_metadata_only:
+            self.session.proxies = {}
         if self.scene_n:
             try:
                 self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n - 1]
@@ -449,7 +459,9 @@ def download_movie(url):
         overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
         is_silent=args.silent,
-        semgent_validity_check=args.validate
+        semgent_validity_check=args.validate,
+        proxy = args.proxy,
+        proxy_metadata_only = args.proxy_metadata
     )
     movie_instance.download()
 
@@ -505,6 +517,8 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
     parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
+    parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
+    parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
     args = parser.parse_args()
 
     log_level = logging.ERROR if args.silent else logging.INFO
