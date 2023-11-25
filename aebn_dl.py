@@ -15,27 +15,22 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-from urllib3.util.retry import Retry
-
 try:
     import lxml.etree as ET
-    import requests
-    from fake_useragent import UserAgent
+    from curl_cffi import requests
     from lxml import html
-    from requests.adapters import HTTPAdapter
     from tqdm import tqdm
 except ModuleNotFoundError:
     print("""
 You need to install required modules:
     lxml (https://pypi.org/project/lxml/)
-    requests (https://pypi.org/project/requests/)
-    fake-useragent (https://pypi.org/project/fake-useragent/)
+    curl-cffi (https://pypi.org/project/curl-cffi/)
     tqdm (https://pypi.org/project/tqdm/)
 
 If you have pip (normally installed with python), run this command in a terminal (cmd):
-    pip install lxml requests tqdm fake-useragent
+    pip install lxml curl-cffi tqdm
     or
-    pip3 install lxml requests tqdm fake-useragent
+    pip3 install lxml curl-cffi tqdm
           """)
     sys.exit()
 
@@ -103,12 +98,9 @@ class Movie:
         logger.info(self.file_name + ".mp4")
 
     def _create_new_session(self):
-        # https://stackoverflow.com/a/47475019/14931505
         self.session = requests.Session()
-        retry = Retry(connect=3, backoff_factor=0.5)
-        adapter = HTTPAdapter(max_retries=retry)
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
+        self.session.impersonate = "chrome110"
+        self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
         if self.proxy:
             proxies = {
                 "http": self.proxy,
@@ -116,8 +108,37 @@ class Movie:
             }
             self.session.proxies = proxies
 
-        # setting random user agent
-        self.session.headers["User-Agent"] = UserAgent().random
+    def _send_request(self, request_type, url, headers=None, data=None, max_retries=3):
+        retry_timeout = 3
+        if request_type.lower() == 'get':
+            for _ in range(max_retries):
+                try:
+                    response = self.session.get(url, headers=headers)
+                    assert response.ok
+                    return response
+                except Exception as e:
+                    logger.info(f"Request failed: {e}")
+                    time.sleep(retry_timeout)
+            logger.info("Max retries exceeded. Unable to complete the request.")
+            return None  # Return None after max retries reached
+
+        elif request_type.lower() == 'post':
+            for _ in range(max_retries):
+                try:
+                    response = self.session.post(url, data=data, headers=headers)
+                    assert response.ok
+                    return response
+                except Exception as e:
+                    logger.info(f"Request failed: {e}")
+                    time.sleep(retry_timeout)
+
+            logger.info("Max retries exceeded. Unable to complete the request.")
+            return None  # Return None after max retries reached
+
+        else:
+            logger.info("Invalid request type. Use 'get' or 'post'.")
+            return None  # Return None for invalid request type
+
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
@@ -135,7 +156,7 @@ class Movie:
         return text
 
     def _scrape_info(self):
-        content = html.fromstring(self.session.get(self.movie_url).content)
+        content = html.fromstring(self._send_request('get', self.movie_url).content)
         self.url_content_type = self.movie_url.split("/")[3]
         self.movie_id = self.movie_url.split("/")[5]
         self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
@@ -169,7 +190,7 @@ class Movie:
             return
 
         # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
-        r = self.session.get(cover_url)
+        r = self._send_request('get', cover_url)
         f = open(output, "wb")
         f.write(r.content)
         f.close()
@@ -184,8 +205,9 @@ class Movie:
     def _calcualte_scenes_boundaries(self):
         # using data from m.aebn.net to calcualte scene segment boundaries
         self.scenes_boundaries = []
-        response = html.fromstring(self.session.get(f"https://m.aebn.net/movie/{self.movie_id}").content)
-        scene_elems = response.xpath('//div[@class="scroller"]')
+        response = self._send_request('get', f"https://m.aebn.net/movie/{self.movie_id}")
+        html_tree = html.fromstring(response.content)
+        scene_elems = html_tree.xpath('//div[@class="scroller"]')
         for scene_el in scene_elems:
             start_timing = int(scene_el.get("data-time-start"))
             end_timing = start_timing + int(scene_el.get("data-time-duration"))
@@ -219,15 +241,15 @@ class Movie:
 
     def _get_manifest_content(self):
         # Make HTTP request to get the manifest
-        response = self.session.get(self.manifest_url)
-        response.raise_for_status()  # Raise an exception for non-2xx status codes
+        response = self._send_request('get', self.manifest_url)
         self.manifest_content = response.content
 
     def _get_new_manifest_url(self):
         headers = {}
         headers["content-type"] = "application/x-www-form-urlencoded"
         data = f"movieId={self.movie_id}&isPreview=true&format=DASH"
-        content = self.session.post(f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver", headers=headers, data=data).json()
+        url = f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver"
+        content = self._send_request('post', url, headers=headers, data=data).json()
         self.manifest_url = content["url"]
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
 
@@ -381,7 +403,7 @@ class Movie:
                     return content
             return True
         try:
-            response = self.session.get(segment_url)
+            response = self._send_request('get', segment_url)
         except:
             return False
         if return_bytes:
