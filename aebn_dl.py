@@ -103,6 +103,7 @@ class Movie:
 
     def _create_new_session(self):
         self.session = requests.Session()
+        self.session.http_version = 2
         self.session.impersonate = "chrome110"
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
         if self.proxy:
