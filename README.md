@@ -2,18 +2,17 @@
 - Python 3.6 or higher
 - FFmpeg (provide directory as a prameter or add to PATH)
 - lxml (https://pypi.org/project/lxml/)
-- requests (https://pypi.org/project/requests/)
+- curl-cffi (https://pypi.org/project/requests/](https://pypi.org/project/curl-cffi/)
 - tqdm (https://pypi.org/project/tqdm/)
-- fake-useragent (https://pypi.org/project/fake-useragent/)
 
 ## Usage
 
 1. Install the required modules using pip:
 
 ```
-pip install requests lxml tqdm fake-useragent
+pip install lxml curl-cffi tqdm
 or
-pip3 install requests lxml tqdm fake-useragent
+pip3 install lxml curl-cffi tqdm
 ```
 2. Run the script with the desired movie URL:
 ```
