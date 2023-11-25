@@ -36,7 +36,7 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height=1, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
+    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
                  scene_padding=None, is_silent=False, proxy=None, proxy_metadata_only = False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
                  resolution_force=False, include_performer_names=False, semgent_validity_check=False):
 
@@ -71,10 +71,10 @@ class Movie:
                 logger.info(f"Scene padding: {self.scene_padding} seconds")
             else:
                 logger.info("Downloading the full movie, scene padding will be ignored")
-        if self.target_height > 1:
-            logger.info(f"Target resolution: {self.target_height}")
-        elif self.target_height == 1:
+        if self.target_height is None:
             logger.info("Target resolution: Highest")
+        elif self.target_height > 0:
+            logger.info(f"Target resolution: {self.target_height}")
         elif self.target_height == 0:
             logger.info("Target resolution: Lowest")
         self._ffmpeg_check()
@@ -310,7 +310,7 @@ class Movie:
         self._add_stream("audio", self._find_best_good_audio_stream(video_streams))
         if self.target_height == 0:
             video_stream_id, self.target_height = video_streams[0]
-        elif self.target_height == 1:
+        elif self.target_height is None:
             video_stream_id, self.target_height = video_streams[-1]
         elif self.target_height:
             video_stream_id = next((sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
@@ -526,7 +526,7 @@ if __name__ == "__main__":
     parser.add_argument("url", help="URL of the movie")
     parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
     parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
-    parser.add_argument("-r", "--resolution", type=int, default=1,
+    parser.add_argument("-r", "--resolution", type=int,
                         help="Desired video resolution by pixel height. "
                         "If not found, the nearest lower resolution will be used. "
                         "Use 0 to select the lowest available resolution. "
