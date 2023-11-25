@@ -85,7 +85,11 @@ class Movie:
         self._get_manifest_content()
         self._parse_streams_from_manifest()
         self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
-        self.file_name += " " + ", ".join(self.performers) if self.include_performer_names else ""
+        if self.include_performer_names:
+            if not self.performers and self.scene_n:
+                logger.info("No performers listed for scene %s", self.scene_n)
+            if self.performers:
+                self.file_name += " " + ", ".join(self.performers)
         self.file_name += f" {self.target_height}p"
         logger.info(self.file_name)
         if self.scene_n:
