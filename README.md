@@ -1,9 +1,9 @@
 ## Dependencies
 - Python 3.6 or higher
 - FFmpeg (provide directory as a prameter or add to PATH)
-- lxml (https://pypi.org/project/lxml/)
-- curl-cffi (https://pypi.org/project/requests/](https://pypi.org/project/curl-cffi/)
-- tqdm (https://pypi.org/project/tqdm/)
+- [lxml](https://pypi.org/project/lxml/)
+- [curl-cffi](https://pypi.org/project/curl-cffi/)
+- [tqdm](https://pypi.org/project/tqdm/)
 
 ## Usage
 
