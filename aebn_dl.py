@@ -114,7 +114,7 @@ class Movie:
                 "http": self.proxy,
                 "https": self.proxy
             }
-        self.session.proxies = proxies
+            self.session.proxies = proxies
 
         # setting random user agent
         self.session.headers["User-Agent"] = UserAgent().random
