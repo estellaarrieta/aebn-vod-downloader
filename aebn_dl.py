@@ -36,8 +36,8 @@ If you have pip (normally installed with python), run this command in a terminal
 
 
 class Movie:
-    def __init__(self, url, target_height, start_segment, end_segment, ffmpeg_dir, scene_n, output_dir, work_dir,
-                 scene_padding, is_silent, proxy, proxy_metadata_only = False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
+    def __init__(self, url, target_height=1, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
+                 scene_padding=None, is_silent=False, proxy=None, proxy_metadata_only = False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
                  resolution_force=False, include_performer_names=False, semgent_validity_check=False):
 
         self.movie_url = url
