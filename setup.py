@@ -10,7 +10,7 @@ setup(
     install_requires=required_packages,
     entry_points={
         'console_scripts': [
-            'aebn-dl = aebn_dl:main'
+            'aebn-dl = aebn-dl:main'
         ]
     },
 )
