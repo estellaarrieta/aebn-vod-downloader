@@ -6,12 +6,12 @@ pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev
 ```
 2. Run the script with the desired movie URL:
 ```
-aebn_dl https://*.aebn.com/*/movies/* [Arguments]
+aebndl https://*.aebn.com/*/movies/* [Arguments]
 ```
 3. The script will download the movie and save it in the current working directory.
 #### Example Usage With Arguments
 ```
-aebn_dl [URL] --resolution 720 --scene 2
+aebndl [URL] --resolution 720 --scene 2
 ```
 To download scene 2 in 720p resolution
 
@@ -25,7 +25,7 @@ To download scene 2 in 720p resolution
 ## Usage for Concurrent Downloads
 You can use a `list.txt` file with multiple URL's (one per line) and pass it instead of a URL to the script, for example
 ```
-aebn_dl list.txt [Arguments]
+aebndl list.txt [Arguments]
 ```
 It will download the videos in parallel with a default of 5 threads (concurrent downloads). The download queue will keep replenishing to the set maximum threads, until all the URL's are processed. You can change the threads with the `-t/--threads` argument.
 
