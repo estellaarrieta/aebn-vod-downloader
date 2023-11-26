@@ -2,7 +2,7 @@
 
 1. Install the script using pip:
 ```
-pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@package
+pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev
 ```
 2. Run the script with the desired movie URL:
 ```
