@@ -119,30 +119,27 @@ class Movie:
             for _ in range(max_retries):
                 try:
                     response = self.session.get(url, headers=headers)
-                    assert response.ok
                     return response
                 except Exception as e:
                     logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
             logger.info("Max retries exceeded. Unable to complete the request.")
-            return None  # Return None after max retries reached
+            raise Exception
 
         elif request_type.lower() == 'post':
             for _ in range(max_retries):
                 try:
                     response = self.session.post(url, data=data, headers=headers)
-                    assert response.ok
                     return response
                 except Exception as e:
                     logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
 
             logger.info("Max retries exceeded. Unable to complete the request.")
-            return None  # Return None after max retries reached
+            raise Exception
 
         else:
             logger.info("Invalid request type. Use 'get' or 'post'.")
-            return None  # Return None for invalid request type
 
 
     def _construct_paths(self):
@@ -411,16 +408,18 @@ class Movie:
             response = self._send_request('get', segment_url)
         except:
             return False
-        if return_bytes:
-            return response.content
-
+        
         if response.status_code == 404 and segment_number == self.total_number_of_data_segments:
             # just skip if the last segment does not exist
             # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
+            logger.debug("Skipping non-existing segment")
             self.end_segment -= 1
             return True
-        if response.status_code >= 403 or not response.content:
+        
+        if not response.ok:
             return False
+        if return_bytes:
+            return response.content
         if not os.path.exists(self.work_dir):
             os.mkdir(self.work_dir)
         with open(segment_path, 'wb') as f:
