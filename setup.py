@@ -4,13 +4,13 @@ with open('requirements.txt') as f:
     required_packages = f.read().splitlines()
 
 setup(
-    name='aebn-dl',
+    name='aebn_dl',
     version='0.3.0',
     packages=find_packages(),
     install_requires=required_packages,
     entry_points={
         'console_scripts': [
-            'aebn-dl = aebn_dl:main'
+            'aebn_dl = aebn_dl.aebn_dl:main'
         ]
     },
 )
