@@ -469,9 +469,9 @@ class Movie:
             self._join_files(stream_files, stream['path'], tqdm_desc=f"{stream['human_name']} segments")
 
 
-def download_movie(url):
+def download_movie(args):
     movie_instance = Movie(
-        url,
+        url = args.url,
         output_dir=args.output_dir,
         work_dir=args.work_dir,
         target_height=args.resolution,
@@ -517,8 +517,7 @@ def convert_line_endings(file_path):
             open_file.write(content)
         logger.info('Converted list.txt to unix line endings, important for linux processing')
 
-
-if __name__ == "__main__":
+def main():
     # Make Ctrl-C work when deamon threads are running
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
@@ -551,13 +550,14 @@ if __name__ == "__main__":
     log_level = logging.ERROR if args.silent else logging.INFO
 
     logging.basicConfig(level=log_level, format='%(message)s')  # Set the initial logging level
+    global logger
     logger = logging.getLogger(__name__)  # Create a logger instance for the script
 
     q = queue.Queue()
     # validate the url
     result = urlparse(args.url)
     if result.scheme and result.netloc:
-        download_movie(args.url)
+        download_movie(args)
     # if missing or invalid, check for a list.txt and download concurrently
     elif args.url == "list.txt":
         if sys.platform == 'linux':
@@ -589,7 +589,7 @@ Are you sure you want to continue? (Y/n) ''').casefold()
         max_threads = args.threads or len(urllist) if len(urllist)<default_max_threads else default_max_threads
         # print("Using max threads", max_threads)
 
-        for x in range(max_threads):
+        for _ in range(max_threads):
             t = threading.Thread(target=worker, args=(q,))
             t.daemon = True
             t.start()
@@ -603,3 +603,6 @@ Are you sure you want to continue? (Y/n) ''').casefold()
             logger.info("Download queue complete")
     else:
         logger.error("Invalid URL or list.txt not passed")
+
+if __name__ == "__main__":
+    main()
