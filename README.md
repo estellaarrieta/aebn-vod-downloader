@@ -1,10 +1,10 @@
 ## Usage
 
-1. Install the script using pip:
+1. Install or upgrade the package using pip:
 ```
-pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev
+pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev -U
 ```
-2. Run the script with the desired movie URL:
+2. Run with the desired movie URL:
 ```
 aebndl https://*.aebn.com/*/movies/* [Arguments]
 ```
