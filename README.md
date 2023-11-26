@@ -7,18 +7,13 @@
 
 ## Usage
 
-1. Install the required modules using pip:
-
+1. Install the script using pip:
 ```
-pip install lxml curl-cffi tqdm
-or
-pip3 install lxml curl-cffi tqdm
+pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@package
 ```
 2. Run the script with the desired movie URL:
 ```
-python aebn_dl.py https://*.aebn.com/*/movies/*
-or
-python3 aebn_dl.py https://*.aebn.com/*/movies/*
+aebn_dl.py https://*.aebn.com/*/movies/*
 ```
 
 3. The script will download the movie and save it in the current working directory.
