@@ -122,7 +122,7 @@ class Movie:
                     assert response.ok
                     return response
                 except Exception as e:
-                    logger.info(f"Request failed: {e}")
+                    logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
             logger.info("Max retries exceeded. Unable to complete the request.")
             return None  # Return None after max retries reached
@@ -134,7 +134,7 @@ class Movie:
                     assert response.ok
                     return response
                 except Exception as e:
-                    logger.info(f"Request failed: {e}")
+                    logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
 
             logger.info("Max retries exceeded. Unable to complete the request.")
