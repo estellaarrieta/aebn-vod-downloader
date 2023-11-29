@@ -2,7 +2,7 @@
 
 1. Install or upgrade the package using pip:
 ```
-pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev -U
+pip install git+https://github.com/estellaarrieta/aebn-vod-downloader -U
 ```
 2. Run with the desired movie URL:
 ```
