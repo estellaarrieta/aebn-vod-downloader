@@ -1,0 +1,3 @@
+lxml
+curl-cffi
+tqdm
