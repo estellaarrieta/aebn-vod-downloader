@@ -1,13 +1,14 @@
 from setuptools import find_packages, setup
 
-with open('requirements.txt') as f:
-    required_packages = f.read().splitlines()
-
 setup(
     name='aebndl',
-    version='0.3.2',
+    version='0.3.5',
     packages=find_packages(),
-    install_requires=required_packages,
+    install_requires=[
+        'lxml',
+        'curl-cffi',
+        'tqdm',
+    ],
     entry_points={
         'console_scripts': [
             'aebndl = aebn_dl.aebn_dl:main'
