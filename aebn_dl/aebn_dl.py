@@ -494,10 +494,10 @@ def download_movie(args):
 
 def worker(q):
     while True:
-        value = q.get()
+        task_args = q.get()
         # subtract 1 because the main thread is included
-        logger.info(f"Total threads {threading.active_count() - 1} | Processing {value}")
-        download_movie(value)
+        logger.info(f"Total threads {threading.active_count() - 1} | Processing {task_args.url} | {task_args.scene}")
+        download_movie(task_args)
         q.task_done()
 
 
@@ -552,13 +552,13 @@ def main():
     global logger
     logger = logging.getLogger(__name__)  # Create a logger instance for the script
 
-    q = queue.Queue()
     # validate the url
     result = urlparse(args.url)
     if result.scheme and result.netloc:
         download_movie(args)
     # if missing or invalid, check for a list.txt and download concurrently
     elif args.url == "list.txt":
+        q = queue.Queue()
         if sys.platform == 'linux':
             convert_line_endings("list.txt")  # important to have the proper newlines for linux
         file = open("list.txt")
@@ -567,23 +567,13 @@ def main():
         while "" in urllist:  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
-        if args.threads and logger.getEffectiveLevel() != logging.ERROR:
-            while True:
-                answer = input('''
+        logger.info('''
 \033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
 may result in throttling and/or get your IP blocked.
 HTTP requests to servers usually have rate limits, so hammering a server
 will throttle your connections and cause temporary timeouts.
-Be reasonable and use with caution!\033[0m
-                               
-Are you sure you want to continue? (Y/n) ''').casefold()
-                if answer == "y" or answer == "":
-                    print()
-                    break
-                elif answer == "n":
-                    sys.exit()
-                else:
-                    print("Please enter y or n")
+Be reasonable and use with caution!\033[0m''')
+
         default_max_threads = 5
         max_threads = args.threads or len(urllist) if len(urllist)<default_max_threads else default_max_threads
         # print("Using max threads", max_threads)
@@ -593,8 +583,14 @@ Are you sure you want to continue? (Y/n) ''').casefold()
             t.daemon = True
             t.start()
 
-        for url in urllist:
-            q.put(url)
+        for line in urllist:
+            task_args = argparse.Namespace(**vars(args))  # Create a copy of args
+            if "|" in line:
+                task_args.url = line.split("|")[0]
+                task_args.scene = int(line.split("|")[1])
+            else:
+                task_args.url = line
+            q.put(task_args)
 
         q.join()  # wait for all the threads to finish, then continue below
 
