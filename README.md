@@ -1,31 +1,40 @@
+## Dependencies
+- Python 3.6 or higher
+- FFmpeg (provide directory as a prameter or add to PATH)
+
 ## Usage
 
 1. Install or upgrade the package using pip:
-```
-pip install git+https://github.com/estellaarrieta/aebn-vod-downloader -U
-```
+   * Stable version:
+    ```
+    pip install git+https://github.com/estellaarrieta/aebn-vod-downloader -U
+    ```
+   * Dev version:
+    ```
+    pip install git+https://github.com/estellaarrieta/aebn-vod-downloader.git@dev -U
+    ```
 2. Run with the desired movie URL:
 ```
-aebndl https://*.aebn.com/*/movies/* [Arguments]
+aebndl [URL] [Arguments]
 ```
 3. The script will download the movie and save it in the current working directory.
 #### Example Usage With Arguments
 ```
-aebndl [URL] --resolution 720 --scene 2
+aebndl https://*.aebn.com/*/movies/* --resolution 720 --scene 2
 ```
 To download scene 2 in 720p resolution
-
-## Dependencies
-- Python 3.6 or higher
-- FFmpeg (provide directory as a prameter or add to PATH)
-- [lxml](https://pypi.org/project/lxml/)
-- [curl-cffi](https://pypi.org/project/curl-cffi/)
-- [tqdm](https://pypi.org/project/tqdm/)
 
 ## Usage for Concurrent Downloads
 You can use a `list.txt` file with multiple URL's (one per line) and pass it instead of a URL to the script, for example
 ```
 aebndl list.txt [Arguments]
+```
+### list.txt example
+Put a scene number after the url, separated by a `|` to download a single scene instead of a full movie
+```
+https://vod.aebn.com/straight/movies/****/****|3
+https://vod.aebn.com/straight/movies/****/****
+https://straight.aebn.com/straight/movies/****/****|1
 ```
 It will download the videos in parallel with a default of 5 threads (concurrent downloads). The download queue will keep replenishing to the set maximum threads, until all the URL's are processed. You can change the threads with the `-t/--threads` argument.
 
@@ -57,3 +66,8 @@ You can customize the behavior of the script by passing different arguments when
 | `-t` | `--threads` | Threads for concurrent downloads (default: 5) |
 | `-proxy` | | Proxy to use (format: `protocol://username:password@ip:port`) |
 | `-pm` | `--proxy-metadata` | Use proxies for metadata only, and not for downloading. |
+
+## External Libraries Used
+- [lxml](https://pypi.org/project/lxml/)
+- [curl-cffi](https://pypi.org/project/curl-cffi/)
+- [tqdm](https://pypi.org/project/tqdm/)
