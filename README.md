@@ -1,6 +1,6 @@
 ## Dependencies
 - Python 3.6 or higher
-- FFmpeg (provide directory as a prameter or add to PATH)
+- FFmpeg (provide directory as an argument or add to PATH)
 
 ## Usage
 
