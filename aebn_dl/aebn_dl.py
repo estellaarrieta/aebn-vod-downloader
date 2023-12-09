@@ -575,8 +575,8 @@ will throttle your connections and cause temporary timeouts.
 Be reasonable and use with caution!\033[0m''')
 
         default_max_threads = 5
-        max_threads = args.threads or len(urllist) if len(urllist)<default_max_threads else default_max_threads
-        # print("Using max threads", max_threads)
+        max_threads = args.threads or (len(urllist) if len(urllist) < default_max_threads else default_max_threads)
+        logger.info("Threads:", max_threads)
 
         for _ in range(max_threads):
             t = threading.Thread(target=worker, args=(q,))
