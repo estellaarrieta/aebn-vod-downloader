@@ -62,8 +62,8 @@ You can customize the behavior of the script by passing different arguments when
 | `-ow` | `--overwrite` | Overwrite existing audio and video segments if already present |
 | `-k` | `--keep` | Keep audio and video segments after downloading |
 | `-v` |`--validate`| Validate segments as they download or found on disk|
-| `-s` | `--silent` | Run the script in silent mode |
-| `-t` | `--threads` | Threads for concurrent downloads (default: 5) |
+| `-l` | `--log-level` | Set the logging level. Any level above INFO disables progress bars (default: INFO) |
+| `-t` | `--threads` | Threads for concurrent downloads with list.txt (default: 5) |
 | `-proxy` | | Proxy to use (format: `protocol://username:password@ip:port`) |
 | `-pm` | `--proxy-metadata` | Use proxies for metadata only, and not for downloading. |
 
