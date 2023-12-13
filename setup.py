@@ -10,6 +10,6 @@ setup(
         'tqdm',
     ],
     entry_points={
-        'console_scripts': ['aebndl = aebn_dl:main']
+        'console_scripts': ['aebndl = aebn_dl.cli:main']
     },
 )
