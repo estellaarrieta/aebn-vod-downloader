@@ -19,7 +19,7 @@ from tqdm import tqdm
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
                  scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
-                 resolution_force=False, include_performer_names=False, semgent_validity_check=False):
+                 resolution_force=False, include_performer_names=False, segment_validity_check=False):
         self._logger_setup(log_level)
         self.movie_url = url
         self.output_dir = output_dir or os.getcwd()
@@ -36,7 +36,7 @@ class Movie:
         self.keep_segments_after_download = keep_segments_after_download
         self.scene_padding = scene_padding
         self.log_level = log_level
-        self.semgent_validity_check = semgent_validity_check
+        self.segment_validity_check = segment_validity_check
         self.stream_map = []
         self.proxy = proxy
         self.proxy_metadata_only = proxy_metadata_only
@@ -57,7 +57,7 @@ class Movie:
         self.logger.info(f"Proxy: {self.proxy}") if self.proxy else None
         self.logger.info(f"Output dir: {self.output_dir}")
         self.logger.info(f"Work dir: {self.work_dir}")
-        self.logger.info(f"Segment validity check: {self.semgent_validity_check}")
+        self.logger.info(f"Segment validity check: {self.segment_validity_check}")
         if self.scene_padding:
             if self.scene_n:
                 self.logger.info(f"Scene padding: {self.scene_padding} seconds")
@@ -346,7 +346,7 @@ class Movie:
         for stream in self.stream_map:
             # downloading init segment
             self._download_segment(stream['type'], stream['id'])
-            if self.semgent_validity_check:
+            if self.segment_validity_check:
                 init_segment_name = f"{stream['type']}i_{stream['id']}.mp4"
                 init_segment_path = os.path.join(self.movie_work_dir, init_segment_name)
                 init_segment_bytes = open(init_segment_path, 'rb').read()
@@ -367,7 +367,7 @@ class Movie:
                     if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
                         sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} download error")
 
-                if self.semgent_validity_check:
+                if self.segment_validity_check:
                     # slow jank
                     data_segment_path = os.path.join(self.movie_work_dir, f"{stream['type']}_{stream['id']}_{current_segment_number}.mp4")
                     if os.path.exists(data_segment_path):
