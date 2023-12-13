@@ -1,44 +1,26 @@
 #!/usr/bin/env python3
-import argparse
-import concurrent.futures
 import datetime
 import email.utils as eut
 import logging
 import math
 import os
 import shutil
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
-try:
-    import lxml.etree as ET
-    from curl_cffi import requests
-    from lxml import html
-    from tqdm import tqdm
-except ModuleNotFoundError:
-    print("""
-You need to install required modules:
-    lxml (https://pypi.org/project/lxml/)
-    curl-cffi (https://pypi.org/project/curl-cffi/)
-    tqdm (https://pypi.org/project/tqdm/)
-
-If you have pip (normally installed with python), run this command in a terminal (cmd):
-    pip install lxml curl-cffi tqdm
-    or
-    pip3 install lxml curl-cffi tqdm
-          """)
-    sys.exit()
+import lxml.etree as ET
+from curl_cffi import requests
+from lxml import html
+from tqdm import tqdm
 
 
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
-                 scene_padding=None, is_silent=False, proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
+                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
                  resolution_force=False, include_performer_names=False, semgent_validity_check=False):
-
+        self._logger_setup(log_level)
         self.movie_url = url
         self.output_dir = output_dir or os.getcwd()
         self.work_dir = work_dir or os.getcwd()
@@ -53,29 +35,40 @@ class Movie:
         self.overwrite_existing_files = overwrite_existing_files
         self.keep_segments_after_download = keep_segments_after_download
         self.scene_padding = scene_padding
-        self.is_silent = is_silent
+        self.log_level = log_level
         self.semgent_validity_check = semgent_validity_check
         self.stream_map = []
         self.proxy = proxy
         self.proxy_metadata_only = proxy_metadata_only
 
+    def _logger_setup(self, log_level):
+        movie_logger = logging.getLogger('movie_logger')
+        movie_logger.setLevel(log_level)
+        formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
+        main_handler = logging.StreamHandler()
+        main_handler.setFormatter(formatter)
+        movie_logger.addHandler(main_handler)
+
+        self.logger = movie_logger
+        self.is_silent = True if movie_logger.getEffectiveLevel() > logging.INFO else False
+
     def download(self):
-        logger.info(f"Input URL: {self.movie_url}")
-        logger.info(f"Proxy: {self.proxy}") if self.proxy else None
-        logger.info(f"Output dir: {self.output_dir}")
-        logger.info(f"Work dir: {self.work_dir}")
-        logger.info(f"Segment validity check: {self.semgent_validity_check}")
+        self.logger.info(f"Input URL: {self.movie_url}")
+        self.logger.info(f"Proxy: {self.proxy}") if self.proxy else None
+        self.logger.info(f"Output dir: {self.output_dir}")
+        self.logger.info(f"Work dir: {self.work_dir}")
+        self.logger.info(f"Segment validity check: {self.semgent_validity_check}")
         if self.scene_padding:
             if self.scene_n:
-                logger.info(f"Scene padding: {self.scene_padding} seconds")
+                self.logger.info(f"Scene padding: {self.scene_padding} seconds")
             else:
-                logger.info("Downloading the full movie, scene padding will be ignored")
+                self.logger.info("Downloading the full movie, scene padding will be ignored")
         if self.target_height is None:
-            logger.info("Target resolution: Highest")
+            self.logger.info("Target resolution: Highest")
         elif self.target_height > 0:
-            logger.info(f"Target resolution: {self.target_height}")
+            self.logger.info(f"Target resolution: {self.target_height}")
         elif self.target_height == 0:
-            logger.info("Target resolution: Lowest")
+            self.logger.info("Target resolution: Lowest")
         self._ffmpeg_check()
         self._create_new_session()
         self._scrape_info()
@@ -86,19 +79,19 @@ class Movie:
         self.file_name += f" Scene {self.scene_n}" if self.scene_n else ""
         if self.include_performer_names:
             if not self.performers and self.scene_n:
-                logger.info("No performers listed for scene %s", self.scene_n)
+                self.logger.info(f"No performers listed for scene {self.scene_n}")
             if self.performers:
                 self.file_name += " " + ", ".join(self.performers)
         self.file_name += f" {self.target_height}p"
-        logger.info(self.file_name)
+        self.logger.info(self.file_name)
         if self.scene_n:
             self._calcualte_scenes_boundaries()
         self._download_segments()
         self._join_segments_into_stream()
         self._ffmpeg_mux_streams(*[stream["path"] for stream in self.stream_map])
         self._work_folder_cleanup()
-        logger.info("All done!")
-        logger.info(self.file_name + ".mp4")
+        self.logger.info("All done!")
+        self.logger.info(f"{self.file_name}.mp4")
 
     def _create_new_session(self):
         self.session = requests.Session()
@@ -120,9 +113,9 @@ class Movie:
                     response = self.session.get(url, headers=headers)
                     return response
                 except Exception as e:
-                    logger.debug(f"Request failed: {e}")
+                    self.logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
-            logger.info("Max retries exceeded. Unable to complete the request.")
+            self.logger.debug("Max retries exceeded. Unable to complete the request.")
             raise Exception
 
         elif request_type.lower() == 'post':
@@ -131,14 +124,14 @@ class Movie:
                     response = self.session.post(url, data=data, headers=headers)
                     return response
                 except Exception as e:
-                    logger.debug(f"Request failed: {e}")
+                    self.logger.debug(f"Request failed: {e}")
                     time.sleep(retry_timeout)
 
-            logger.info("Max retries exceeded. Unable to complete the request.")
+            self.logger.debug("Max retries exceeded. Unable to complete the request.")
             raise Exception
 
         else:
-            logger.info("Invalid request type. Use 'get' or 'post'.")
+            self.logger.debug("Invalid request type. Use 'get' or 'post'.")
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
@@ -180,7 +173,7 @@ class Movie:
                 self._get_covers(self.cover_front, 'cover-a')
                 self._get_covers(self.cover_back, 'cover-b')
             except Exception as e:
-                logger.warning("Error fetching cover urls: ", e)
+                self.logger.warning("Error fetching cover urls: ", e)
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
@@ -200,7 +193,7 @@ class Movie:
         os.utime(output, (now, modified))
 
         if os.path.isfile(output):
-            logger.info("Saved cover:", output)
+            self.logger.info("Saved cover:", output)
 
     def _calcualte_scenes_boundaries(self):
         # using data from m.aebn.net to calcualte scene segment boundaries
@@ -251,6 +244,7 @@ class Movie:
         url = f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver"
         content = self._send_request('post', url, headers=headers, data=data).json()
         self.manifest_url = content["url"]
+        self.logger.debug(f"Manifest URL: {self.manifest_url}")
         self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
 
     def _sort_streams_by_video_height(self, video_stream_elements):
@@ -266,7 +260,7 @@ class Movie:
 
         # Write the media bytes to the stdin of the FFmpeg process
         _, stderr_data = process.communicate(input=media_bytes)
-        # logger.info(stderr_data.decode())
+        # self.logger.debug(stderr_data.decode())
 
         # Check if FFmpeg found any errors
         if b"Multiple frames in a packet" in stderr_data or b"Error" in stderr_data:
@@ -282,7 +276,7 @@ class Movie:
             data_segment_bytes = self._download_segment("a", stream_id, return_bytes=True, segment_number=data_segment_number)
             if not self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):  # type: ignore
                 return stream_id
-            # logger.info("Skipping bad audio stream")
+            self.logger.debug("Skipping bad audio stream")
 
     def _add_stream(self, stream_name, stream_id):
         stream_type = stream_name[0].lower()
@@ -301,7 +295,7 @@ class Movie:
         video_adaptation_sets = root.xpath('.//*[local-name()="AdaptationSet" and @mimeType="video/mp4"]//*[local-name()="Representation"]')
         video_streams = self._sort_streams_by_video_height(video_adaptation_sets)
         streams_res_string = " ".join(str(video_stream[1]) for video_stream in video_streams)
-        logger.info("Available video streams: %s", streams_res_string)
+        self.logger.info(f"Available video streams: {streams_res_string}")
         self._add_stream("audio", self._find_best_good_audio_stream(video_streams))
         if self.target_height == 0:
             video_stream_id, self.target_height = video_streams[0]
@@ -324,7 +318,7 @@ class Movie:
         # number of segments calc
         total_number_of_data_segments = total_duration_seconds / self.segment_duration
         total_number_of_data_segments = math.ceil(total_number_of_data_segments)
-        logger.info(f"Total segments: {total_number_of_data_segments+1}")  # +1 to include init segment
+        self.logger.info(f"Total segments: {total_number_of_data_segments+1}")  # +1 to include init segment
         return total_number_of_data_segments
 
     def _work_folder_cleanup(self):
@@ -347,7 +341,7 @@ class Movie:
         self.start_segment = self.start_segment or 0
         self.end_segment = self.end_segment or self.total_number_of_data_segments
 
-        logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
+        self.logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
 
         for stream in self.stream_map:
             # downloading init segment
@@ -364,11 +358,11 @@ class Movie:
             download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
                 if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
-                    logger.info("trying again")
+                    self.logger.debug("segiment download error, trying again")
                     # segment download error, trying again with a new manifest
                     self._create_new_session()
-                    self._get_new_manifest_url()
                     # self._get_manifest_content()
+                    self._get_new_manifest_url()
                     if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
                         sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} download error")
 
@@ -378,7 +372,7 @@ class Movie:
                     if os.path.exists(data_segment_path):
                         data_segment_bytes = open(data_segment_path, 'rb').read()
                         if self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):
-                            logger.info(f"{stream['type']} {current_segment_number} segment media error")
+                            self.logger.info(f"{stream['type']} {current_segment_number} segment media error")
                             os.remove(data_segment_path)
                             self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number)
                             data_segment_bytes = open(data_segment_path, 'rb').read()
@@ -410,7 +404,7 @@ class Movie:
         if response.status_code == 404 and segment_number == self.total_number_of_data_segments:
             # just skip if the last segment does not exist
             # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
-            logger.debug("Skipping non-existing segment")
+            self.logger.debug("Last segment is 404, skipping")
             self.end_segment -= 1
             return True
 
@@ -426,14 +420,15 @@ class Movie:
 
     def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
         output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
-        cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}" -loglevel warning'
+        cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}"'
+        cmd += " -loglevel warning" if self.logger.getEffectiveLevel() > logging.DEBUG else ""
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
         out = subprocess.run(cmd, shell=True, cwd=cwd)
         assert out.returncode == 0
 
         output_path_uri = Path(output_path).as_uri()
-        logger.info(output_path_uri)
+        self.logger.info(output_path_uri)
 
     def _join_files(self, files, output_path, tqdm_desc):
         join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
@@ -464,127 +459,3 @@ class Movie:
                 stream_files.append(segment_path)
             # concat all segment data into a single file
             self._join_files(stream_files, stream['path'], tqdm_desc=f"{stream['human_name']} segments")
-
-
-def download_movie(args):
-    movie_instance = Movie(
-        url=args.url,
-        output_dir=args.output_dir,
-        work_dir=args.work_dir,
-        target_height=args.resolution,
-        resolution_force=args.resolution_force,
-        include_performer_names=args.include_performer_names,
-        ffmpeg_dir=args.ffmpeg,
-        scene_n=args.scene,
-        scene_padding=args.scene_padding,
-        start_segment=args.start_segment,
-        end_segment=args.end_segment,
-        download_covers=args.covers,
-        overwrite_existing_files=args.overwrite,
-        keep_segments_after_download=args.keep,
-        is_silent=args.silent,
-        semgent_validity_check=args.validate,
-        proxy=args.proxy,
-        proxy_metadata_only=args.proxy_metadata
-    )
-    movie_instance.download()
-
-
-def convert_line_endings(file_path):
-    # replacement strings
-    WINDOWS_LINE_ENDING = b'\r\n'
-    UNIX_LINE_ENDING = b'\n'
-
-    with open(file_path, 'rb') as open_file:
-        content = open_file.read()
-
-    # Windows to Unix
-    if WINDOWS_LINE_ENDING in content:
-        content = content.replace(WINDOWS_LINE_ENDING, UNIX_LINE_ENDING)
-        with open(file_path, 'wb') as open_file:
-            open_file.write(content)
-        logger.info('Converted list.txt to unix line endings, important for linux processing')
-
-
-def main():
-    # Make Ctrl-C work when deamon threads are running
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="URL of the movie")
-    parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
-    parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
-    parser.add_argument("-r", "--resolution", type=int,
-                        help="Desired video resolution by pixel height. "
-                        "If not found, the nearest lower resolution will be used. "
-                        "Use 0 to select the lowest available resolution. "
-                        "(default: highest available)")
-    parser.add_argument("-rf", "--resolution-force", action="store_true", help="If the target resolution not available, exit with an error")
-    parser.add_argument("-pfn", "--include-performer-names", action="store_true", help="Include performer names in the output filename")
-    parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
-    parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
-    parser.add_argument("-p", "--scene-padding", type=int, help="Set padding for scenes boundaries in seconds")
-    parser.add_argument("-ss", "-start", "--start-segment", type=int, help="Specify the start segment")
-    parser.add_argument("-es", "-end", "--end-segment", type=int, help="Specify the end segment")
-    parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
-    parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
-    parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
-    parser.add_argument("-s", "--silent", action="store_true", help="Run the script in silent mode")
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
-    parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
-    parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
-    args = parser.parse_args()
-
-    log_level = logging.ERROR if args.silent else logging.INFO
-
-    logging.basicConfig(level=log_level, format='%(message)s')  # Set the initial logging level
-    global logger
-    logger = logging.getLogger(__name__)  # Create a logger instance for the script
-
-    # validate the url
-    result = urlparse(args.url)
-    if result.scheme and result.netloc:
-        download_movie(args)
-    # if missing or invalid, check for a list.txt and download concurrently
-    elif args.url == "list.txt":
-        if sys.platform == 'linux':
-            convert_line_endings("list.txt")  # important to have the proper newlines for linux
-        file = open("list.txt")
-        urllist = file.read().splitlines()  # remove the newlines
-        file.close()
-        while "" in urllist:  # remove empty strings from the list (resulted from empty lines)
-            urllist.remove("")
-
-        logger.info('''
-\033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
-may result in throttling and/or get your IP blocked.
-HTTP requests to servers usually have rate limits, so hammering a server
-will throttle your connections and cause temporary timeouts.
-Be reasonable and use with caution!\033[0m''')
-
-        default_max_threads = 5
-        max_threads = args.threads or (len(urllist) if len(urllist) < default_max_threads else default_max_threads)
-        logger.info(f"Threads: {max_threads}")
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-            futures = []
-            for line in urllist:
-                task_args = argparse.Namespace(**vars(args))  # Create a copy of args
-                if "|" in line:
-                    task_args.url = line.split("|")[0]
-                    task_args.scene = int(line.split("|")[1])
-                else:
-                    task_args.url = line
-                future = executor.submit(download_movie, task_args)
-                futures.append(future)
-
-            # for future in concurrent.futures.as_completed(futures):
-            #     pass
-
-    else:
-        logger.error("Invalid URL or list.txt not passed")
-
-
-if __name__ == "__main__":
-    main()
