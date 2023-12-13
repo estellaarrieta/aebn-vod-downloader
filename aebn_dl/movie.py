@@ -93,12 +93,12 @@ class Movie:
         self.logger.info("All done!")
         self.logger.info(f"{self.file_name}.mp4")
 
-    def _create_new_session(self):
+    def _create_new_session(self, use_proxies=True):
         self.session = requests.Session()
         self.session.http_version = 2
         self.session.impersonate = "chrome110"
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
-        if self.proxy:
+        if self.proxy and use_proxies:
             proxies = {
                 "http": self.proxy,
                 "https": self.proxy
@@ -353,6 +353,7 @@ class Movie:
 
             # using tqdm object so we can manipulate progress
             # and display it as init segment was part of the loop
+
             segments_to_download = range(self.start_segment, self.end_segment + 1)
             download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream['human_name'] + " download", disable=self.is_silent)
             download_bar.update()  # increment by 1
@@ -360,7 +361,7 @@ class Movie:
                 if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
                     self.logger.debug("segiment download error, trying again")
                     # segment download error, trying again with a new manifest
-                    self._create_new_session()
+                    self._create_new_session(use_proxies=not self.proxy_metadata_only)
                     # self._get_manifest_content()
                     self._get_new_manifest_url()
                     if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
