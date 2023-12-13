@@ -60,6 +60,8 @@ class Movie:
         self.logger.info(f"Output dir: {self.output_dir}")
         self.logger.info(f"Work dir: {self.work_dir}")
         self.logger.info(f"Segment validity check: {self.segment_validity_check}")
+        if self.aggressive_segment_cleaning:
+            self.logger.info("Aggressive cleanup enabled, segments will be deleted before stream muxing")
         if self.scene_padding:
             if self.scene_n:
                 self.logger.info(f"Scene padding: {self.scene_padding} seconds")
@@ -433,8 +435,6 @@ class Movie:
 
     def _join_files(self, files, output_path, tqdm_desc):
         # concats segments into a single file
-        if self.aggressive_segment_cleaning:
-            self.logger.info("Agressive cleanup enabled, segments will be deleted before stream muxing")
         join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
         with open(output_path, 'wb') as f:
             for segment_file_path in files:
