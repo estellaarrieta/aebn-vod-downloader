@@ -11,7 +11,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'aebndl = aebn_dl.main:main'
+            'console_scripts': ['aebndl = aebn_dl:main'],
         ]
     },
 )
