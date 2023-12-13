@@ -25,8 +25,9 @@ def download_movie(args):
         download_covers=args.covers,
         overwrite_existing_files=args.overwrite,
         keep_segments_after_download=args.keep,
+        aggressive_segment_cleaning=args.aggressive_cleaning,
         log_level=args.log_level,
-        semgent_validity_check=args.validate,
+        segment_validity_check=args.validate,
         proxy=args.proxy,
         proxy_metadata_only=args.proxy_metadata
     )
@@ -70,7 +71,7 @@ def main():
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("url", help="URL of the movie")
+    parser.add_argument("url", help="URL of the movie or list.txt")
     parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
     parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
     parser.add_argument("-r", "--resolution", type=int,
@@ -88,11 +89,15 @@ def main():
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
+    parser.add_argument("-ac", '--aggressive-cleaning', action='store_true', help='Delete segments instantly after a successful join into stream.'
+                        'By default, segments are deleted on success, after stream muxing'
+                        'If you are really low on disk space, you can use this option but'
+                        'in case of muxing error you would have to download it all again')
     parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
     parser.add_argument('-l', '--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         default='INFO', help='Set the logging level (default: INFO)'
-                                            'Any level above INFO would also disable progress bars')
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads (default=5)")
+                        'Any level above INFO would also disable progress bars')
+    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads with list.txt (default=5)")
     parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
     parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
     args = parser.parse_args()
@@ -106,7 +111,7 @@ def main():
     elif args.url == "list.txt":
         if sys.platform == 'linux':
             convert_line_endings("list.txt")  # important to have the proper newlines for linux
-            main_logger.degub('Converted list.txt to unix line endings, important for linux processing')
+            main_logger.debug('Converted list.txt to unix line endings, important for linux processing')
         file = open("list.txt")
         urllist = file.read().splitlines()  # remove the newlines
         file.close()
