@@ -61,7 +61,8 @@ You can customize the behavior of the script by passing different arguments when
 | `-c` | `--covers` | Download front and back covers |
 | `-ow` | `--overwrite` | Overwrite existing audio and video segments if already present |
 | `-k` | `--keep` | Keep audio and video segments after downloading |
-| `-v` |`--validate`| Validate segments as they download or found on disk|
+| `-ac` | `--aggressive-cleaning` | Delete segments instantly after a successful join into stream. By default, segments are deleted on success, after stream muxing. If you are really low on disk space, you can use this option but in case of muxing error you would have to download it all again |
+| `-v` |`--validate`| Validate segments as they download or found on disk |
 | `-l` | `--log-level` | Set the logging level. Any level above INFO disables progress bars (default: INFO) |
 | `-t` | `--threads` | Threads for concurrent downloads with list.txt (default: 5) |
 | `-proxy` | | Proxy to use (format: `protocol://username:password@ip:port`) |
