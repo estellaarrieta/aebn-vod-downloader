@@ -18,7 +18,8 @@ from tqdm import tqdm
 
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
-                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, keep_segments_after_download=False,
+                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, 
+                 keep_segments_after_download=False, aggressive_segment_cleaning = False,
                  resolution_force=False, include_performer_names=False, segment_validity_check=False):
         self._logger_setup(log_level)
         self.movie_url = url
@@ -33,6 +34,7 @@ class Movie:
         self.scene_n = scene_n
         self.download_covers = download_covers
         self.overwrite_existing_files = overwrite_existing_files
+        self.aggressive_segment_cleaning = aggressive_segment_cleaning
         self.keep_segments_after_download = keep_segments_after_download
         self.scene_padding = scene_padding
         self.log_level = log_level
@@ -322,8 +324,11 @@ class Movie:
 
     def _work_folder_cleanup(self):
         if not self.keep_segments_after_download:
+            self.logger.info("Deleting temp files...")
             for stream in self.stream_map:
                 os.remove(stream['path']) if os.path.exists(stream['path']) else None
+            for segment_path in self.segment_file_list:
+                os.remove(segment_path) if os.path.exists(segment_path) else None
 
         os.rmdir(self.movie_work_dir) if not os.listdir(self.movie_work_dir) else None
         os.rmdir(self.movie_work_dir) if not os.listdir(self.work_dir) else None
@@ -429,8 +434,10 @@ class Movie:
         self.logger.info(output_path_uri)
 
     def _join_files(self, files, output_path, tqdm_desc):
+        # concats segments into a single file
+        if self.aggressive_segment_cleaning:
+            self.logger.info("Agressive cleanup enabled, segments will be deleted before stream muxing")
         join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
-        delete_bar = tqdm(files, desc=f"Deleting {tqdm_desc}", disable=self.is_silent or self.keep_segments_after_download)
         with open(output_path, 'wb') as f:
             for segment_file_path in files:
                 with open(segment_file_path, 'rb') as segment_file:
@@ -438,22 +445,22 @@ class Movie:
                     segment_file.close()
                     f.write(content)
                     join_bar.update()
-
-                if not self.keep_segments_after_download:
+                if self.aggressive_segment_cleaning:
                     os.remove(segment_file_path)
-                    delete_bar.update()
-
         join_bar.close()
-        delete_bar.close()
 
     def _join_segments_into_stream(self):
+        self.segment_file_list = [] # only used for clean up
         for stream in self.stream_map:
             # delete old joined stream if exists
             os.remove(stream['path']) if os.path.exists(stream['path']) else None
-            stream_files = []
-            stream_files.append(os.path.join(self.movie_work_dir, f"{stream['type']}i_{stream['id']}.mp4"))
+            segment_files = []
+            os.remove(stream['path']) if os.path.exists(stream['path']) else None
+            init_path = os.path.join(self.movie_work_dir, f"{stream['type']}i_{stream['id']}.mp4")
+            segment_files.append(init_path)
+            self.segment_file_list.append(init_path)
             for num in range(self.start_segment, self.end_segment + 1):
-                segment_path = os.path.join(self.movie_work_dir, f"{stream['type']}_{stream['id']}_{num}.mp4")
-                stream_files.append(segment_path)
-            # concat all segment data into a single file
-            self._join_files(stream_files, stream['path'], tqdm_desc=f"{stream['human_name']} segments")
+                data_path = os.path.join(self.movie_work_dir, f"{stream['type']}_{stream['id']}_{num}.mp4")
+                segment_files.append(data_path)
+                self.segment_file_list.append(data_path)
+            self._join_files(segment_files, stream['path'], tqdm_desc=f"{stream['human_name']} segments")
