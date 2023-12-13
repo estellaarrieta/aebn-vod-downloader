@@ -117,10 +117,9 @@ class Movie:
                     response = self.session.get(url, headers=headers)
                     return response
                 except Exception as e:
-                    self.logger.debug(f"Request failed: {e}")
+                    self.logger.debug(f"{url} Request failed: {e}")
                     time.sleep(retry_timeout)
-            self.logger.debug("Max retries exceeded. Unable to complete the request.")
-            raise Exception
+            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
 
         elif request_type.lower() == 'post':
             for _ in range(max_retries):
@@ -128,14 +127,13 @@ class Movie:
                     response = self.session.post(url, data=data, headers=headers)
                     return response
                 except Exception as e:
-                    self.logger.debug(f"Request failed: {e}")
+                    self.logger.debug(f"{url} Request failed: {e}")
                     time.sleep(retry_timeout)
 
-            self.logger.debug("Max retries exceeded. Unable to complete the request.")
-            raise Exception
+            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
 
         else:
-            self.logger.debug("Invalid request type. Use 'get' or 'post'.")
+            raise Exception("Invalid request type. Use 'get' or 'post'.")
 
     def _construct_paths(self):
         self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
