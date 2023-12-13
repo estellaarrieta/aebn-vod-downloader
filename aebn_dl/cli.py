@@ -6,6 +6,8 @@ import signal
 import sys
 from urllib.parse import urlparse
 
+import pkg_resources
+
 from .movie import Movie
 
 
@@ -103,6 +105,9 @@ def main():
     args = parser.parse_args()
 
     main_logger = logger_setup(args.log_level)
+    version = pkg_resources.require("aebndl")[0].version
+    main_logger.debug(f"Version: {version}")
+
     # validate the url
     result = urlparse(args.url)
     if result.scheme and result.netloc:
