@@ -6,7 +6,7 @@ import signal
 import sys
 from urllib.parse import urlparse
 
-import Movie
+from movie import Movie
 
 
 def download_movie(args):
