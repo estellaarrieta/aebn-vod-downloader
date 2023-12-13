@@ -85,7 +85,7 @@ class Movie:
         self.file_name += f" {self.target_height}p"
         self.logger.info(self.file_name)
         if self.scene_n:
-            self._calcualte_scenes_boundaries()
+            self._calculate_scenes_boundaries()
         self._download_segments()
         self._join_segments_into_stream()
         self._ffmpeg_mux_streams(*[stream["path"] for stream in self.stream_map])
@@ -194,8 +194,8 @@ class Movie:
         if os.path.isfile(output):
             self.logger.info("Saved cover:", output)
 
-    def _calcualte_scenes_boundaries(self):
-        # using data from m.aebn.net to calcualte scene segment boundaries
+    def _calculate_scenes_boundaries(self):
+        # using data from m.aebn.net to calculate scene segment boundaries
         self.scenes_boundaries = []
         response = self._send_request('get', f"https://m.aebn.net/movie/{self.movie_id}")
         html_tree = html.fromstring(response.content)
@@ -275,7 +275,7 @@ class Movie:
             data_segment_bytes = self._download_segment("a", stream_id, save_to_disk=False, segment_number=data_segment_number)
             if self._is_valid_media(init_segment_bytes + data_segment_bytes):
                 return stream_id
-            self.logger.debug("Skipping bad audio stream")
+            self.logger.debug("Skipping a bad audio stream")
 
     def _add_stream(self, stream_name, stream_id):
         stream_type = stream_name[0].lower()
@@ -407,7 +407,7 @@ class Movie:
                 return response.content
             elif response.status_code == 404 and segment_number == self.total_number_of_data_segments:
                 # just skip if the last segment does not exist
-                # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
+                # segment calc returns a rounded up float which is sometimes bigger than the actual number of segments
                 self.logger.debug("Last segment is 404, skipping")
                 self.end_segment -= 1
                 return None
