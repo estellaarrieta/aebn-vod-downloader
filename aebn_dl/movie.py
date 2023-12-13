@@ -251,7 +251,7 @@ class Movie:
         sorted_video_streams = sorted(video_streams, key=lambda video_stream: video_stream[1])
         return sorted_video_streams
 
-    def _ffmpeg_error_check(self, media_bytes):
+    def _is_valid_media(self, media_bytes):
         cmd = 'ffmpeg -f mp4 -i pipe:0 -f null -'
 
         # Use subprocess.Popen with PIPE to create a pipe for input
@@ -263,17 +263,17 @@ class Movie:
 
         # Check if FFmpeg found any errors
         if b"Multiple frames in a packet" in stderr_data or b"Error" in stderr_data:
-            return True  # Errors found
-        return False  # No errors found
+            return False  # Not Valid
+        return True  # Valid
 
     def _find_best_good_audio_stream(self, video_streams):
         # some audio streams can be corrupted, using ffmpeg to test
         for stream_id, _ in reversed(video_streams):
-            init_segment_bytes = self._download_segment("a", stream_id, return_bytes=True)
+            init_segment_bytes = self._download_segment("a", stream_id, save_to_disk=False)
             # grab audio segment from the middle of the stream
             data_segment_number = int(self.total_number_of_data_segments / 2)
-            data_segment_bytes = self._download_segment("a", stream_id, return_bytes=True, segment_number=data_segment_number)
-            if not self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):  # type: ignore
+            data_segment_bytes = self._download_segment("a", stream_id, save_to_disk=False, segment_number=data_segment_number)
+            if self._is_valid_media(init_segment_bytes + data_segment_bytes):
                 return stream_id
             self.logger.debug("Skipping bad audio stream")
 
@@ -344,11 +344,8 @@ class Movie:
 
         for stream in self.stream_map:
             # downloading init segment
-            self._download_segment(stream['type'], stream['id'])
-            if self.segment_validity_check:
-                init_segment_name = f"{stream['type']}i_{stream['id']}.mp4"
-                init_segment_path = os.path.join(self.movie_work_dir, init_segment_name)
-                init_segment_bytes = open(init_segment_path, 'rb').read()
+            init_segment_bytes = self._download_segment(stream['type'], stream['id'],
+                                                        overwrite=self.overwrite_existing_files)
 
             # using tqdm object so we can manipulate progress
             # and display it as init segment was part of the loop
@@ -357,31 +354,24 @@ class Movie:
             download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream['human_name'] + " download", disable=self.is_silent)
             download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
-                if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
-                    self.logger.debug("segiment download error, trying again")
-                    # segment download error, trying again with a new manifest
-                    self._create_new_session(use_proxies=not self.proxy_metadata_only)
-                    # self._get_manifest_content()
-                    self._get_new_manifest_url()
-                    if not self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number):
-                        sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} download error")
+                data_segment_bytes = self._download_segment(stream['type'], stream['id'],
+                                                            segment_number=current_segment_number,
+                                                            overwrite=self.overwrite_existing_files)
 
-                if self.segment_validity_check:
-                    # slow jank
-                    data_segment_path = os.path.join(self.movie_work_dir, f"{stream['type']}_{stream['id']}_{current_segment_number}.mp4")
-                    if os.path.exists(data_segment_path):
-                        data_segment_bytes = open(data_segment_path, 'rb').read()
-                        if self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):
-                            self.logger.info(f"{stream['type']} {current_segment_number} segment media error")
-                            os.remove(data_segment_path)
-                            self._download_segment(stream['type'], stream['id'], segment_number=current_segment_number)
-                            data_segment_bytes = open(data_segment_path, 'rb').read()
-                            if self._ffmpeg_error_check(init_segment_bytes + data_segment_bytes):
-                                sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} download error")
+                if self.segment_validity_check and data_segment_bytes:
+                    # slow
+                    if not self._is_valid_media(init_segment_bytes + data_segment_bytes):
+                        self.logger.info(f"{stream['type']} {current_segment_number} segment media error")
+                        data_segment_bytes = self._download_segment(stream['type'], stream['id'],
+                                                                    segment_number=current_segment_number,
+                                                                    overwrite=True)
+                        if not self._is_valid_media(init_segment_bytes + data_segment_bytes):
+                            sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} Segment not valid!")
+
                 download_bar.update()
             download_bar.close()
 
-    def _download_segment(self, stream_type, stream_id, return_bytes=False, segment_number=None):
+    def _download_segment(self, stream_type, stream_id, save_to_disk=True, segment_number=None, overwrite=False, max_tries=2):
         if isinstance(segment_number, int):
             segment_name = f"{stream_type}_{stream_id}_{segment_number}"
         else:
@@ -389,34 +379,42 @@ class Movie:
 
         segment_url = f"{self.base_stream_url}/{segment_name}.mp4d"
         segment_path = os.path.join(self.movie_work_dir, f"{segment_name}.mp4")
-        if os.path.exists(segment_path) and not self.overwrite_existing_files:
-            if return_bytes:
-                with open(segment_path, 'rb') as segment_file:
-                    content = segment_file.read()
-                    segment_file.close()
-                    return content
-            return True
-        try:
-            response = self._send_request('get', segment_url)
-        except:
-            return False
+        if os.path.exists(segment_path) and not overwrite:
+            with open(segment_path, 'rb') as segment_file:
+                segment_bytes = segment_file.read()
+                segment_file.close()
+                return segment_bytes
 
-        if response.status_code == 404 and segment_number == self.total_number_of_data_segments:
-            # just skip if the last segment does not exist
-            # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
-            self.logger.debug("Last segment is 404, skipping")
-            self.end_segment -= 1
-            return True
+        response = None
+        tries = 0
+        while response is None and tries < max_tries:
+            try:
+                response = self._send_request('get', segment_url)
+            except Exception as e:
+                self.logger.debug("Segment download error: {}".format(e))
+                self._create_new_session(use_proxies=not self.proxy_metadata_only)
+                self._get_manifest_content()
+                self._get_new_manifest_url()
+                tries += 1
 
-        if not response.ok:
-            return False
-        if return_bytes:
-            return response.content
-        if not os.path.exists(self.work_dir):
-            os.mkdir(self.work_dir)
-        with open(segment_path, 'wb') as f:
-            f.write(response.content)
-        return True
+        if response:
+            if response.ok:
+                if save_to_disk:
+                    if not os.path.exists(self.work_dir):
+                        os.mkdir(self.work_dir)
+                    with open(segment_path, 'wb') as f:
+                        f.write(response.content)
+                return response.content
+            elif response.status_code == 404 and segment_number == self.total_number_of_data_segments:
+                # just skip if the last segment does not exist
+                # segment calc returns a rouded up float which is sometimes bigger than the actual number of segments
+                self.logger.debug("Last segment is 404, skipping")
+                self.end_segment -= 1
+                return None
+            else:
+                sys.exit(f"{segment_name} Download error! Response Status : {response.status_code}")
+        else:
+            sys.exit(f"{segment_name} Download error! Failed to get a response")
 
     def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
         output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
