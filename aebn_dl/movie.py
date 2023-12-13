@@ -99,11 +99,10 @@ class Movie:
         self.session.impersonate = "chrome110"
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
         if self.proxy and use_proxies:
-            proxies = {
+            self.session.proxies = {
                 "http": self.proxy,
                 "https": self.proxy
             }
-            self.session.proxies = proxies
 
     def _send_request(self, request_type, url, headers=None, data=None, max_retries=3):
         retry_timeout = 3
