@@ -21,8 +21,8 @@ class Movie:
                  scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, 
                  keep_segments_after_download=False, aggressive_segment_cleaning = False,
                  resolution_force=False, include_performer_names=False, segment_validity_check=False):
-        self._logger_setup(log_level)
         self.movie_url = url
+        self._logger_setup(log_level)
         self.output_dir = output_dir or os.getcwd()
         self.work_dir = work_dir or os.getcwd()
         self.target_height = target_height
@@ -44,7 +44,7 @@ class Movie:
         self.proxy_metadata_only = proxy_metadata_only
 
     def _logger_setup(self, log_level):
-        movie_logger = logging.getLogger('movie_logger')
+        movie_logger = logging.getLogger(self.movie_url.split("/")[5])
         movie_logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
         main_handler = logging.StreamHandler()
@@ -92,6 +92,7 @@ class Movie:
         self._join_segments_into_stream()
         self._ffmpeg_mux_streams(*[stream["path"] for stream in self.stream_map])
         self._work_folder_cleanup()
+        self.logger.info(Path(self.output_path).as_uri())
         self.logger.info("All done!")
         self.logger.info(f"{self.file_name}.mp4")
 
@@ -135,6 +136,7 @@ class Movie:
             self.logger.debug("Invalid request type. Use 'get' or 'post'.")
 
     def _construct_paths(self):
+        self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
@@ -422,16 +424,12 @@ class Movie:
             sys.exit(f"{segment_name} Download error! Failed to get a response")
 
     def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
-        output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
-        cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}"'
+        cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{self.output_path}"'
         cmd += " -loglevel warning" if self.logger.getEffectiveLevel() > logging.DEBUG else ""
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
         out = subprocess.run(cmd, shell=True, cwd=cwd)
         assert out.returncode == 0
-
-        output_path_uri = Path(output_path).as_uri()
-        self.logger.info(output_path_uri)
 
     def _join_files(self, files, output_path, tqdm_desc):
         # concats segments into a single file
