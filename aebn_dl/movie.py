@@ -11,7 +11,6 @@ import time
 from pathlib import Path
 
 import lxml.etree as ET
-import pkg_resources
 from curl_cffi import requests
 from lxml import html
 from tqdm import tqdm
@@ -75,9 +74,16 @@ class Movie:
                 handler.close()  # Close the file handler before deleting the file
         os.remove(f"{self.logger.name}.log")
 
+    def _log_version(self):
+        try:
+            import pkg_resources
+            version = pkg_resources.require("aebndl")[0].version
+            self.logger.debug(f"Version: {version}")
+        except Exception as e:
+            self.logger.debug(f"Unknown version, {e}")
+
     def download(self):
-        version = pkg_resources.require("aebndl")[0].version
-        self.logger.debug(f"Version: {version}")
+        self._log_version()
         self.logger.info(f"Input URL: {self.movie_url}")
         self.logger.info(f"Proxy: {self.proxy}") if self.proxy else None
         self.logger.info(f"Output dir: {self.output_dir}")
