@@ -22,7 +22,6 @@ class Movie:
                  keep_segments_after_download=False, aggressive_segment_cleaning=False,
                  resolution_force=False, include_performer_names=False, segment_validity_check=False, keep_logs=False):
         self.movie_url = url
-        self._logger_setup(log_level)
         self.output_dir = output_dir or os.getcwd()
         self.work_dir = work_dir or os.getcwd()
         self.target_height = target_height
@@ -43,9 +42,10 @@ class Movie:
         self.stream_map = []
         self.proxy = proxy
         self.proxy_metadata_only = proxy_metadata_only
+        self._logger_setup(log_level)
 
     def _logger_setup(self, log_level):
-        logger_name = self.movie_url.split("/")[5] + self.scene_n if self.scene_n else self.movie_url.split("/")[5]
+        logger_name = self.movie_url.split("/")[5] + "_" + str(self.scene_n) if self.scene_n else self.movie_url.split("/")[5]
         movie_logger = logging.getLogger(logger_name)
         movie_logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
@@ -364,6 +364,9 @@ class Movie:
                 os.remove(segment_path) if os.path.exists(segment_path) else None
             self.logger.info("Deleted temp files")
 
+        os.rmdir(self.movie_work_dir) if not os.listdir(self.movie_work_dir) else None
+        os.rmdir(self.movie_work_dir) if not os.listdir(self.work_dir) else None
+
     def _download_segments(self):
         if self.proxy and self.proxy_metadata_only:
             self.session.proxies = {}
@@ -377,7 +380,7 @@ class Movie:
         self.end_segment = self.end_segment or self.total_number_of_data_segments
 
         self.logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
-        
+
         for stream in self.stream_map:
             # downloading init segment
             init_segment_bytes = self._download_segment(stream['type'], stream['id'],
