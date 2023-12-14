@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import lxml.etree as ET
+import pkg_resources
 from curl_cffi import requests
 from lxml import html
 from tqdm import tqdm
@@ -20,7 +21,7 @@ class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
                  scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, 
                  keep_segments_after_download=False, aggressive_segment_cleaning = False,
-                 resolution_force=False, include_performer_names=False, segment_validity_check=False):
+                 resolution_force=False, include_performer_names=False, segment_validity_check=False, keep_logs = False):
         self.movie_url = url
         self._logger_setup(log_level)
         self.output_dir = output_dir or os.getcwd()
@@ -38,6 +39,7 @@ class Movie:
         self.keep_segments_after_download = keep_segments_after_download
         self.scene_padding = scene_padding
         self.log_level = log_level
+        self.keep_logs = keep_logs
         self.segment_validity_check = segment_validity_check
         self.stream_map = []
         self.proxy = proxy
@@ -45,16 +47,37 @@ class Movie:
 
     def _logger_setup(self, log_level):
         movie_logger = logging.getLogger(self.movie_url.split("/")[5])
+        logger_name = movie_logger.name
         movie_logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
         main_handler = logging.StreamHandler()
         main_handler.setFormatter(formatter)
         movie_logger.addHandler(main_handler)
 
+        file_handler = logging.FileHandler(f'{logger_name}.log')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        movie_logger.addHandler(file_handler)
+
+        # https://stackoverflow.com/questions/6234405/
+        def log_uncaught_exceptions(exctype, value, tb):
+            self.logger.critical("Uncaught exception", exc_info=(exctype, value, tb))
+
+        # Set the exception hook to log uncaught exceptions
+        sys.excepthook = log_uncaught_exceptions
+
         self.logger = movie_logger
         self.is_silent = True if movie_logger.getEffectiveLevel() > logging.INFO else False
 
+    def _delete_log(self):
+        for handler in self.logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.close()  # Close the file handler before deleting the file
+        os.remove(f"{self.logger.name}.log")
+
     def download(self):
+        version = pkg_resources.require("aebndl")[0].version
+        self.logger.debug(f"Version: {version}")
         self.logger.info(f"Input URL: {self.movie_url}")
         self.logger.info(f"Proxy: {self.proxy}") if self.proxy else None
         self.logger.info(f"Output dir: {self.output_dir}")
@@ -87,16 +110,21 @@ class Movie:
             if self.performers:
                 self.file_name += " " + ", ".join(self.performers)
         self.file_name += f" {self.target_height}p"
+        self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
         self.logger.info(self.file_name)
         if self.scene_n:
             self._calculate_scenes_boundaries()
         self._download_segments()
         self._join_segments_into_stream()
+        self.logger.debug("muxing streams")
         self._ffmpeg_mux_streams(*[stream["path"] for stream in self.stream_map])
         self._work_folder_cleanup()
         self.logger.info(Path(self.output_path).as_uri())
-        self.logger.info("All done!")
         self.logger.info(f"{self.file_name}.mp4")
+        self.logger.info("Success!")
+        if not self.keep_logs:
+            self._delete_log()
+            
 
     def _create_new_session(self, use_proxies=True):
         self.session = requests.Session()
@@ -136,7 +164,6 @@ class Movie:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
 
     def _construct_paths(self):
-        self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
@@ -220,7 +247,7 @@ class Movie:
         # check if ffmpeg is available
         ffmpeg_exe = shutil.which("ffmpeg") is not None
         if not ffmpeg_exe and self.ffmpeg_dir is None:
-            sys.exit("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
+            raise Exception("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
 
     def _time_string_to_seconds(self, time_string):
         time_parts = list(map(int, time_string.split(':')))
@@ -326,11 +353,11 @@ class Movie:
 
     def _work_folder_cleanup(self):
         if not self.keep_segments_after_download:
-            self.logger.info("Deleting temp files...")
             for stream in self.stream_map:
                 os.remove(stream['path']) if os.path.exists(stream['path']) else None
             for segment_path in self.segment_file_list:
                 os.remove(segment_path) if os.path.exists(segment_path) else None
+            self.logger.info("Deleted temp files")
 
         os.rmdir(self.movie_work_dir) if not os.listdir(self.movie_work_dir) else None
         os.rmdir(self.movie_work_dir) if not os.listdir(self.work_dir) else None
@@ -342,7 +369,7 @@ class Movie:
             try:
                 self.start_segment, self.end_segment = self.scenes_boundaries[self.scene_n - 1]
             except IndexError:
-                sys.exit(f"Scene {self.scene_n} not found!")
+                raise IndexError(f"Scene {self.scene_n} not found!")
 
         self.start_segment = self.start_segment or 0
         self.end_segment = self.end_segment or self.total_number_of_data_segments
@@ -373,7 +400,7 @@ class Movie:
                                                                     segment_number=current_segment_number,
                                                                     overwrite=True)
                         if not self._is_valid_media(init_segment_bytes + data_segment_bytes):
-                            sys.exit(f"{stream['type']}_{stream['id']}_{current_segment_number} Segment not valid!")
+                            raise Exception(f"{stream['type']}_{stream['id']}_{current_segment_number} Segment not valid!")
 
                 download_bar.update()
             download_bar.close()
@@ -419,16 +446,20 @@ class Movie:
                 self.end_segment -= 1
                 return None
             else:
-                sys.exit(f"{segment_name} Download error! Response Status : {response.status_code}")
+                raise Exception(f"{segment_name} Download error! Response Status : {response.status_code}")
         else:
-            sys.exit(f"{segment_name} Download error! Failed to get a response")
+            raise Exception(f"{segment_name} Download error! Failed to get a response")
 
     def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
         cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{self.output_path}"'
-        cmd += " -loglevel warning" if self.logger.getEffectiveLevel() > logging.DEBUG else ""
+
+        if self.logger.getEffectiveLevel() > logging.DEBUG:
+            # Log full output
+            cmd += " -loglevel warning"
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
-        out = subprocess.run(cmd, shell=True, cwd=cwd)
+        out = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
+        self.logger.warning(f"ffmpeg stderr: {out.stderr}") if out.stderr else None
         assert out.returncode == 0
 
     def _join_files(self, files, output_path, tqdm_desc):
