@@ -6,8 +6,6 @@ import signal
 import sys
 from urllib.parse import urlparse
 
-import pkg_resources
-
 from .movie import Movie
 
 
@@ -99,14 +97,13 @@ def main():
     parser.add_argument('-l', '--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         default='INFO', help='Set the logging level (default: INFO)'
                         'Any level above INFO would also disable progress bars')
+    parser.add_argument("-kl", "--keep-logs", action="store_true", help="Keep logs after successful exit")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads with list.txt (default=5)")
     parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
     parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
     args = parser.parse_args()
 
     main_logger = logger_setup(args.log_level)
-    version = pkg_resources.require("aebndl")[0].version
-    main_logger.debug(f"Version: {version}")
 
     # validate the url
     result = urlparse(args.url)
