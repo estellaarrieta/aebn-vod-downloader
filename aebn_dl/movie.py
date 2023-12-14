@@ -45,8 +45,8 @@ class Movie:
         self.proxy_metadata_only = proxy_metadata_only
 
     def _logger_setup(self, log_level):
-        movie_logger = logging.getLogger(self.movie_url.split("/")[5])
-        logger_name = movie_logger.name
+        logger_name = self.movie_url.split("/")[5] + self.scene_n if self.scene_n else self.movie_url.split("/")[5]
+        movie_logger = logging.getLogger(logger_name)
         movie_logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
         main_handler = logging.StreamHandler()
@@ -364,9 +364,6 @@ class Movie:
                 os.remove(segment_path) if os.path.exists(segment_path) else None
             self.logger.info("Deleted temp files")
 
-        os.rmdir(self.movie_work_dir) if not os.listdir(self.movie_work_dir) else None
-        os.rmdir(self.movie_work_dir) if not os.listdir(self.work_dir) else None
-
     def _download_segments(self):
         if self.proxy and self.proxy_metadata_only:
             self.session.proxies = {}
@@ -380,7 +377,7 @@ class Movie:
         self.end_segment = self.end_segment or self.total_number_of_data_segments
 
         self.logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
-
+        
         for stream in self.stream_map:
             # downloading init segment
             init_segment_bytes = self._download_segment(stream['type'], stream['id'],
