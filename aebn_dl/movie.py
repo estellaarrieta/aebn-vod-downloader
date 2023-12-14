@@ -19,9 +19,9 @@ from tqdm import tqdm
 
 class Movie:
     def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
-                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False, 
-                 keep_segments_after_download=False, aggressive_segment_cleaning = False,
-                 resolution_force=False, include_performer_names=False, segment_validity_check=False, keep_logs = False):
+                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False, overwrite_existing_files=False,
+                 keep_segments_after_download=False, aggressive_segment_cleaning=False,
+                 resolution_force=False, include_performer_names=False, segment_validity_check=False, keep_logs=False):
         self.movie_url = url
         self._logger_setup(log_level)
         self.output_dir = output_dir or os.getcwd()
@@ -124,7 +124,6 @@ class Movie:
         self.logger.info("Success!")
         if not self.keep_logs:
             self._delete_log()
-            
 
     def _create_new_session(self, use_proxies=True):
         self.session = requests.Session()
@@ -454,7 +453,6 @@ class Movie:
         cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{self.output_path}"'
 
         if self.logger.getEffectiveLevel() > logging.DEBUG:
-            # Log full output
             cmd += " -loglevel warning"
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
@@ -477,7 +475,7 @@ class Movie:
         join_bar.close()
 
     def _join_segments_into_stream(self):
-        self.segment_file_list = [] # only used for clean up
+        self.segment_file_list = []  # only used for clean up
         for stream in self.stream_map:
             # delete old joined stream if exists
             os.remove(stream['path']) if os.path.exists(stream['path']) else None
