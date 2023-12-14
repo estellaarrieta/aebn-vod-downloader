@@ -27,6 +27,7 @@ def download_movie(args):
         keep_segments_after_download=args.keep,
         aggressive_segment_cleaning=args.aggressive_cleaning,
         log_level=args.log_level,
+        keep_logs = args.keep_logs,
         segment_validity_check=args.validate,
         proxy=args.proxy,
         proxy_metadata_only=args.proxy_metadata
