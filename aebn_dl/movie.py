@@ -382,6 +382,7 @@ class Movie:
         self.logger.info(f"Downloading segments {self.start_segment} - {self.end_segment}")
 
         for stream in self.stream_map:
+            self.logger.debug(f"Downloading stream {stream['type']} {stream['id']}")
             # downloading init segment
             init_segment_bytes = self._download_segment(stream['type'], stream['id'],
                                                         overwrite=self.overwrite_existing_files)
@@ -419,6 +420,7 @@ class Movie:
         segment_url = f"{self.base_stream_url}/{segment_name}.mp4d"
         segment_path = os.path.join(self.movie_work_dir, f"{segment_name}.mp4")
         if os.path.exists(segment_path) and not overwrite:
+            self.logger.debug(f"{segment_name} found on disk")
             with open(segment_path, 'rb') as segment_file:
                 segment_bytes = segment_file.read()
                 segment_file.close()
@@ -443,6 +445,7 @@ class Movie:
                         os.mkdir(self.work_dir)
                     with open(segment_path, 'wb') as f:
                         f.write(response.content)
+                    self.logger.debug(f"{segment_name} saved to disk")
                 return response.content
             elif response.status_code == 404 and segment_number == self.total_number_of_data_segments:
                 # just skip if the last segment does not exist
