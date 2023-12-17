@@ -118,8 +118,7 @@ class Movie:
         self.file_name += f" {self.target_height}p"
         self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
         self.logger.info(self.file_name)
-        if self.scene_n:
-            self._calculate_scenes_boundaries()
+        self._calculate_scenes_boundaries() if self.scene_n else None
         self._download_segments()
         self._join_segments_into_stream()
         self.logger.debug("muxing streams")
@@ -128,8 +127,7 @@ class Movie:
         self.logger.info(Path(self.output_path).as_uri())
         self.logger.info(f"{self.file_name}.mp4")
         self.logger.info("Success!")
-        if not self.keep_logs:
-            self._delete_log()
+        self._delete_log() if not self.keep_logs else None
 
     def _create_new_session(self, use_proxies=True):
         self.session = requests.Session()
