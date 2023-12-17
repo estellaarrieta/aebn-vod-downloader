@@ -24,10 +24,11 @@ def download_movie(args):
         end_segment=args.end_segment,
         download_covers=args.covers,
         overwrite_existing_files=args.overwrite,
+        target_stream=args.target_stream,
         keep_segments_after_download=args.keep,
         aggressive_segment_cleaning=args.aggressive_cleaning,
         log_level=args.log_level,
-        keep_logs = args.keep_logs,
+        keep_logs=args.keep_logs,
         segment_validity_check=args.validate,
         proxy=args.proxy,
         proxy_metadata_only=args.proxy_metadata
@@ -89,6 +90,7 @@ def main():
     parser.add_argument("-es", "-end", "--end-segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
+    parser.add_argument('-ts', '--target-stream', choices=['audio', 'video'], help='Download just video or just audio stream')
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
     parser.add_argument("-ac", '--aggressive-cleaning', action='store_true', help='Delete segments instantly after a successful join into stream.'
                         'By default, segments are deleted on success, after stream muxing'
