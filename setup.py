@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='aebndl',
-    version='0.3.6',
+    version='0.4.2',
     packages=find_packages(),
     install_requires=[
         'lxml',
@@ -10,8 +10,6 @@ setup(
         'tqdm',
     ],
     entry_points={
-        'console_scripts': [
-            'aebndl = aebn_dl.aebn_dl:main'
-        ]
+        'console_scripts': ['aebndl = aebn_dl.cli:main']
     },
 )
