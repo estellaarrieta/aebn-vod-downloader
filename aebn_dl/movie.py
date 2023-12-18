@@ -172,7 +172,7 @@ class Movie:
         self._download_segments()
         self._join_stream_segmetns()
         if all([self.audio_stream, self.video_stream]):
-            self.logger.debug("Muxing streams")
+            self.logger.info("Muxing streams with ffmpeg")
             self._ffmpeg_mux_streams(self.audio_stream.path, self.video_stream.path)
         else:
             os.remove(self.output_path) if os.path.exists(self.output_path) else None
@@ -523,6 +523,7 @@ class Movie:
         out = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
         self.logger.warning(f"ffmpeg stderr: {out.stderr}") if out.stderr else None
         assert out.returncode == 0
+        self.logger.info(f"ffmpeg muxing success")
 
     def _join_files(self, files, output_path, tqdm_desc):
         # concats segments into a single file
