@@ -90,12 +90,14 @@ class Movie:
         # Console handler with user set level
         console_handler = logging.StreamHandler()
         console_handler.setLevel(log_level)
+        console_handler.set_name("console_handler")
         console_handler.setFormatter(formatter)
         movie_logger.addHandler(console_handler)
 
         # File handler with DEBUG level
         file_handler = logging.FileHandler(f'{logger_name}.log')
         file_handler.setLevel(logging.DEBUG)
+        file_handler.set_name("file_handler")
         file_handler.setFormatter(formatter)
         movie_logger.addHandler(file_handler)
 
@@ -108,6 +110,12 @@ class Movie:
 
         self.logger = movie_logger
         self.is_silent = True if movie_logger.getEffectiveLevel() > logging.INFO else False
+
+    def _get_handler_level(self, handler_name):
+        for handler in self.logger.handlers:
+            if handler.name == handler_name: 
+                return handler.level
+        return None
 
     def _delete_log(self):
         for handler in self.logger.handlers:
@@ -508,7 +516,7 @@ class Movie:
     def _ffmpeg_mux_streams(self, stream_path_1, stream_path_2):
         cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{self.output_path}"'
 
-        if self.logger.getEffectiveLevel() > logging.DEBUG:
+        if self._get_handler_level("console_handler") > logging.DEBUG:
             cmd += " -loglevel warning"
 
         cwd = self.ffmpeg_dir if self.ffmpeg_dir else None
