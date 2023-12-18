@@ -370,7 +370,7 @@ class Movie:
         if self.target_stream and self.target_stream == 'audio' or not self.target_stream:
             audio_stream_id = self._find_best_good_audio_stream(video_streams)
             self.audio_stream = self._Media_stream("audio", audio_stream_id, self.movie_work_dir)
-        elif self.target_stream and self.target_stream == 'video' or not self.target_stream:
+        if self.target_stream and self.target_stream == 'video' or not self.target_stream:
             if self.target_height == 0:
                 video_stream_id, self.target_height = video_streams[0]
             elif self.target_height is None:
