@@ -190,6 +190,7 @@ class Movie:
         self.session.http_version = 2
         self.session.impersonate = "chrome110"
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+        self.session.headers["Connection"] = "keep-alive"
         if self.proxy and use_proxies:
             self.session.proxies = {
                 "http": self.proxy,
