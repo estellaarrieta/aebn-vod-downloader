@@ -198,29 +198,24 @@ class Movie:
 
     def _send_request(self, request_type, url, headers=None, data=None, max_retries=3):
         retry_timeout = 3
-        if request_type.lower() == 'get':
-            for _ in range(max_retries):
-                try:
-                    response = self.session.get(url, headers=headers)
-                    return response
-                except Exception as e:
-                    self.logger.debug(f"{url} Request failed: {e}")
-                    time.sleep(retry_timeout)
-            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
+        supported_methods = ['get', 'post']
 
-        elif request_type.lower() == 'post':
-            for _ in range(max_retries):
-                try:
-                    response = self.session.post(url, data=data, headers=headers)
-                    return response
-                except Exception as e:
-                    self.logger.debug(f"{url} Request failed: {e}")
-                    time.sleep(retry_timeout)
-
-            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
-
-        else:
+        if request_type.lower() not in supported_methods:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
+
+        for _ in range(max_retries):
+            try:
+                if request_type.lower() == 'get':
+                    response = self.session.get(url, headers=headers)
+                else:
+                    response = self.session.post(url, data=data, headers=headers)
+                return response
+
+            except Exception as e:
+                self.logger.debug(f"{url} Request failed: {e}")
+                time.sleep(retry_timeout)
+
+        raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
