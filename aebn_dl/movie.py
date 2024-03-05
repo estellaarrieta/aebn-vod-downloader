@@ -484,8 +484,8 @@ class Movie:
             except Exception as e:
                 self.logger.debug("Segment download error: {}".format(e))
                 self._create_new_session(use_proxies=not self.proxy_metadata_only)
-                self._get_manifest_content()
                 self._get_new_manifest_url()
+                self._get_manifest_content()
                 tries += 1
 
         if response:
