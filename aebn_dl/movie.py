@@ -190,6 +190,7 @@ class Movie:
         self.session.http_version = 2
         self.session.impersonate = "chrome110"
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+        self.session.headers["Connection"] = "keep-alive"
         if self.proxy and use_proxies:
             self.session.proxies = {
                 "http": self.proxy,
@@ -198,29 +199,24 @@ class Movie:
 
     def _send_request(self, request_type, url, headers=None, data=None, max_retries=3):
         retry_timeout = 3
-        if request_type.lower() == 'get':
-            for _ in range(max_retries):
-                try:
-                    response = self.session.get(url, headers=headers)
-                    return response
-                except Exception as e:
-                    self.logger.debug(f"{url} Request failed: {e}")
-                    time.sleep(retry_timeout)
-            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
+        supported_methods = ['get', 'post']
 
-        elif request_type.lower() == 'post':
-            for _ in range(max_retries):
-                try:
-                    response = self.session.post(url, data=data, headers=headers)
-                    return response
-                except Exception as e:
-                    self.logger.debug(f"{url} Request failed: {e}")
-                    time.sleep(retry_timeout)
-
-            raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
-
-        else:
+        if request_type.lower() not in supported_methods:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
+
+        for _ in range(max_retries):
+            try:
+                if request_type.lower() == 'get':
+                    response = self.session.get(url, headers=headers)
+                else:
+                    response = self.session.post(url, data=data, headers=headers)
+                return response
+
+            except Exception as e:
+                self.logger.debug(f"{url} Request failed: {e}")
+                time.sleep(retry_timeout)
+
+        raise Exception(f"{url} Max retries exceeded. Unable to complete the request.")
 
     def _construct_paths(self):
         if not os.path.exists(self.output_dir):
@@ -488,8 +484,8 @@ class Movie:
             except Exception as e:
                 self.logger.debug("Segment download error: {}".format(e))
                 self._create_new_session(use_proxies=not self.proxy_metadata_only)
-                self._get_manifest_content()
                 self._get_new_manifest_url()
+                self._get_manifest_content()
                 tries += 1
 
         if response:
