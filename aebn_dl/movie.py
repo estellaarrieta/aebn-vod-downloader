@@ -154,7 +154,11 @@ class Movie:
             self.logger.info("Target resolution: Lowest")
         self._ffmpeg_check()
         self._create_new_session()
-        self._scrape_info()
+        try:
+            self._scrape_info()
+        except Exception as e:
+            self.logger.error(e)
+            raise Exception("Failed to scrape aebn.com, make sure your isp not blocking it, or use proxy/vpn")
         self._construct_paths()
         self._get_new_manifest_url()
         self._get_manifest_content()
