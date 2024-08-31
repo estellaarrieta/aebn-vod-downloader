@@ -207,13 +207,18 @@ class Movie:
 
         if request_type.lower() not in supported_methods:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
+        
+        cookies = {
+            'ageGated': '',
+            'terms': ''
+        }
 
         for _ in range(max_retries):
             try:
                 if request_type.lower() == 'get':
-                    response = self.session.get(url, headers=headers)
+                    response = self.session.get(url, headers=headers, cookies=cookies)
                 else:
-                    response = self.session.post(url, data=data, headers=headers)
+                    response = self.session.post(url, data=data, headers=headers, cookies=cookies)
                 return response
 
             except Exception as e:
