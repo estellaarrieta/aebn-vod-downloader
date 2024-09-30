@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'lxml',
-        'curl-cffi',
+        'curl_cffi==0.7.1',
         'tqdm',
     ],
     entry_points={
