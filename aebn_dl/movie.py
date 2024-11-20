@@ -205,6 +205,10 @@ class Movie:
         retry_timeout = 3
         supported_methods = ['get', 'post']
 
+        if headers is None:
+            headers = {}
+        headers['Cookie'] = "ageGated="
+
         if request_type.lower() not in supported_methods:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
         
