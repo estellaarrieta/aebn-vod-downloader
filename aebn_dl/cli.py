@@ -31,15 +31,15 @@ def download_movie(args):
         keep_logs=args.keep_logs,
         segment_validity_check=args.validate,
         proxy=args.proxy,
-        proxy_metadata_only=args.proxy_metadata
+        proxy_metadata_only=args.proxy_metadata,
     )
     movie_instance.download()
 
 
 def logger_setup(log_level):
-    main_logger = logging.getLogger('main_logger')
+    main_logger = logging.getLogger("main_logger")
     main_logger.setLevel(log_level)
-    formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
+    formatter = logging.Formatter("%(asctime)s|%(levelname)s|%(message)s", datefmt="%H:%M:%S")
     main_handler = logging.StreamHandler()
     main_handler.setFormatter(formatter)
     main_logger.addHandler(main_handler)
@@ -48,16 +48,16 @@ def logger_setup(log_level):
 
 def convert_line_endings(file_path):
     # replacement strings
-    WINDOWS_LINE_ENDING = b'\r\n'
-    UNIX_LINE_ENDING = b'\n'
+    WINDOWS_LINE_ENDING = b"\r\n"
+    UNIX_LINE_ENDING = b"\n"
 
-    with open(file_path, 'rb') as open_file:
+    with open(file_path, "rb") as open_file:
         content = open_file.read()
 
     # Windows to Unix
     if WINDOWS_LINE_ENDING in content:
         content = content.replace(WINDOWS_LINE_ENDING, UNIX_LINE_ENDING)
-        with open(file_path, 'wb') as open_file:
+        with open(file_path, "wb") as open_file:
             open_file.write(content)
 
 
@@ -76,11 +76,7 @@ def main():
     parser.add_argument("url", help="URL of the movie or list.txt")
     parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
     parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
-    parser.add_argument("-r", "--resolution", type=int,
-                        help="Desired video resolution by pixel height. "
-                        "If not found, the nearest lower resolution will be used. "
-                        "Use 0 to select the lowest available resolution. "
-                        "(default: highest available)")
+    parser.add_argument("-r", "--resolution", type=int, help="Desired video resolution by pixel height. If not found, the nearest lower resolution will be used. Use 0 to select the lowest available resolution. (default: highest available)")
     parser.add_argument("-rf", "--resolution-force", action="store_true", help="If the target resolution not available, exit with an error")
     parser.add_argument("-pfn", "--include-performer-names", action="store_true", help="Include performer names in the output filename")
     parser.add_argument("-f", "--ffmpeg", type=str, help="Specify the location of your ffmpeg directory")
@@ -90,16 +86,19 @@ def main():
     parser.add_argument("-es", "-end", "--end-segment", type=int, help="Specify the end segment")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
-    parser.add_argument('-ts', '--target-stream', choices=['audio', 'video'], help='Download just video or just audio stream')
+    parser.add_argument("-ts", "--target-stream", choices=["audio", "video"], help="Download just video or just audio stream")
     parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
-    parser.add_argument("-ac", '--aggressive-cleaning', action='store_true', help='Delete segments instantly after a successful join into stream.'
-                        'By default, segments are deleted on success, after stream muxing'
-                        'If you are really low on disk space, you can use this option but'
-                        'in case of muxing error you would have to download it all again')
+    parser.add_argument(
+        "-ac",
+        "--aggressive-cleaning",
+        action="store_true",
+        help="Delete segments instantly after a successful join into stream."
+        "By default, segments are deleted on success, after stream muxing"
+        "If you are really low on disk space, you can use this option but"
+        "in case of muxing error you would have to download it all again",
+    )
     parser.add_argument("-v", "--validate", action="store_true", help="Validate segments as they download or found on disk")
-    parser.add_argument('-l', '--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                        default='INFO', help='Set the logging level (default: INFO)'
-                        'Any level above INFO would also disable progress bars')
+    parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Set the logging level (default: INFO) Any level above INFO would also disable progress bars")
     parser.add_argument("-kl", "--keep-logs", action="store_true", help="Keep logs after successful exit")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads with list.txt (default=5)")
     parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
@@ -114,21 +113,21 @@ def main():
         download_movie(args)
     # if missing or invalid, check for a list.txt and download concurrently
     elif args.url == "list.txt":
-        if sys.platform == 'linux':
+        if sys.platform == "linux":
             convert_line_endings("list.txt")  # important to have the proper newlines for linux
-            main_logger.debug('Converted list.txt to unix line endings, important for linux processing')
+            main_logger.debug("Converted list.txt to unix line endings, important for linux processing")
         file = open("list.txt")
         urllist = file.read().splitlines()  # remove the newlines
         file.close()
         while "" in urllist:  # remove empty strings from the list (resulted from empty lines)
             urllist.remove("")
 
-        main_logger.info('''
+        main_logger.info("""
 \033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
 may result in throttling and/or get your IP blocked.
 HTTP requests to servers usually have rate limits, so hammering a server
 will throttle your connections and cause temporary timeouts.
-Be reasonable and use with caution!\033[0m''')
+Be reasonable and use with caution!\033[0m""")
 
         default_max_threads = 3
         max_threads = args.threads or (len(urllist) if len(urllist) < default_max_threads else default_max_threads)
