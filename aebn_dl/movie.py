@@ -11,17 +11,36 @@ import time
 from pathlib import Path
 
 import lxml.etree as ET
-from curl_cffi import requests
 from lxml import html
+from curl_cffi import requests
 from tqdm import tqdm
 
 
 class Movie:
-    def __init__(self, url, target_height=None, start_segment=None, end_segment=None, ffmpeg_dir=None, scene_n=None, output_dir=None, work_dir=None,
-                 scene_padding=None, log_level="INFO", proxy=None, proxy_metadata_only=False, download_covers=False,
-                 overwrite_existing_files=False, target_stream=None,
-                 keep_segments_after_download=False, aggressive_segment_cleaning=False,
-                 resolution_force=False, include_performer_names=False, segment_validity_check=False, keep_logs=False):
+    def __init__(
+        self,
+        url,
+        target_height: int = None,
+        start_segment=None,
+        end_segment=None,
+        ffmpeg_dir=None,
+        scene_n=None,
+        output_dir=None,
+        work_dir=None,
+        scene_padding=None,
+        log_level="INFO",
+        proxy=None,
+        proxy_metadata_only=False,
+        download_covers=False,
+        overwrite_existing_files=False,
+        target_stream=None,
+        keep_segments_after_download=False,
+        aggressive_segment_cleaning=False,
+        resolution_force=False,
+        include_performer_names=False,
+        segment_validity_check=False,
+        keep_logs=False,
+    ):
         """
         Parameters:
         - url: The URL of the movie.
@@ -85,7 +104,7 @@ class Movie:
         movie_logger = logging.getLogger(logger_name)
         movie_logger.setLevel(logging.DEBUG)  # Set the logger level to the lowest (DEBUG)
 
-        formatter = logging.Formatter('%(asctime)s|%(levelname)s|%(message)s', datefmt='%H:%M:%S')
+        formatter = logging.Formatter("%(asctime)s|%(levelname)s|%(message)s", datefmt="%H:%M:%S")
 
         # Console handler with user set level
         console_handler = logging.StreamHandler()
@@ -95,7 +114,7 @@ class Movie:
         movie_logger.addHandler(console_handler)
 
         # File handler with DEBUG level
-        file_handler = logging.FileHandler(f'{logger_name}.log')
+        file_handler = logging.FileHandler(f"{logger_name}.log")
         file_handler.setLevel(logging.DEBUG)
         file_handler.set_name("file_handler")
         file_handler.setFormatter(formatter)
@@ -113,7 +132,7 @@ class Movie:
 
     def _get_handler_level(self, handler_name):
         for handler in self.logger.handlers:
-            if handler.name == handler_name: 
+            if handler.name == handler_name:
                 return handler.level
         return None
 
@@ -126,6 +145,7 @@ class Movie:
     def _log_version(self):
         try:
             import pkg_resources
+
             version = pkg_resources.require("aebndl")[0].version
             self.logger.debug(f"Version: {version}")
         except Exception as e:
@@ -169,7 +189,7 @@ class Movie:
             if not self.performers and self.scene_n:
                 self.logger.info(f"No performers listed for scene {self.scene_n}")
             self.file_name += " " + ", ".join(self.performers) if self.performers else ""
-        self.file_name += f" {self.target_height}p" if self.video_stream else ''
+        self.file_name += f" {self.target_height}p" if self.video_stream else ""
         self.output_path = os.path.join(self.output_dir, f"{self.file_name}.mp4")
         self.logger.info(self.file_name)
         self._calculate_scenes_boundaries() if self.scene_n else None
@@ -196,26 +216,20 @@ class Movie:
         self.session.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
         self.session.headers["Connection"] = "keep-alive"
         if self.proxy and use_proxies:
-            self.session.proxies = {
-                "http": self.proxy,
-                "https": self.proxy
-            }
+            self.session.proxies = {"http": self.proxy, "https": self.proxy}
 
     def _send_request(self, request_type, url, headers=None, data=None, max_retries=3):
         retry_timeout = 3
-        supported_methods = ['get', 'post']
+        supported_methods = ["get", "post"]
 
         if request_type.lower() not in supported_methods:
             raise Exception("Invalid request type. Use 'get' or 'post'.")
-        
-        cookies = {
-            'ageGated': '',
-            'terms': ''
-        }
+
+        cookies = {"ageGated": "", "terms": ""}
 
         for _ in range(max_retries):
             try:
-                if request_type.lower() == 'get':
+                if request_type.lower() == "get":
                     response = self.session.get(url, headers=headers, cookies=cookies)
                 else:
                     response = self.session.post(url, data=data, headers=headers, cookies=cookies)
@@ -237,13 +251,13 @@ class Movie:
             os.makedirs(self.movie_work_dir)
 
     def _remove_chars(self, text):
-        for ch in ['#', '?', '!', ':', '<', '>', '"', '/', '\\', '|', '*']:
+        for ch in ["#", "?", "!", ":", "<", ">", '"', "/", "\\", "|", "*"]:
             if ch in text:
-                text = text.replace(ch, '')
+                text = text.replace(ch, "")
         return text
 
     def _scrape_info(self):
-        content = html.fromstring(self._send_request('get', self.movie_url).content)
+        content = html.fromstring(self._send_request("get", self.movie_url).content)
         self.url_content_type = self.movie_url.split("/")[3]
         self.movie_id = self.movie_url.split("/")[5]
         self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
@@ -261,23 +275,23 @@ class Movie:
         if self.download_covers:
             try:
                 self.cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
-                self.cover_front = 'https:' + self.cover_front.split("?")[0]
+                self.cover_front = "https:" + self.cover_front.split("?")[0]
                 self.cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
-                self.cover_back = 'https:' + self.cover_back.split("?")[0]
-                self._get_covers(self.cover_front, 'cover-a')
-                self._get_covers(self.cover_back, 'cover-b')
+                self.cover_back = "https:" + self.cover_back.split("?")[0]
+                self._get_covers(self.cover_front, "cover-a")
+                self._get_covers(self.cover_back, "cover-b")
             except Exception as e:
-                self.logger.warning("Error fetching cover urls: ", e)
+                self.logger.warning(f"Error fetching cover urls: {e}")
 
     def _get_covers(self, cover_url, cover_name):
         cover_extension = os.path.splitext(cover_url)[1]
-        output = os.path.join(self.output_dir, f'{self.file_name} {cover_name}{cover_extension}')
+        output = os.path.join(self.output_dir, f"{self.file_name} {cover_name}{cover_extension}")
 
         if os.path.isfile(output):
             return
 
         # Save file from http with server timestamp https://stackoverflow.com/a/58814151/3663357
-        r = self._send_request('get', cover_url)
+        r = self._send_request("get", cover_url)
         f = open(output, "wb")
         f.write(r.content)
         f.close()
@@ -287,12 +301,12 @@ class Movie:
         os.utime(output, (now, modified))
 
         if os.path.isfile(output):
-            self.logger.info("Saved cover:", output)
+            self.logger.info(f"Saved cover: {output}")
 
     def _calculate_scenes_boundaries(self):
         # using data from m.aebn.net to calculate scene segment boundaries
         self.scenes_boundaries = []
-        response = self._send_request('get', f"https://m.aebn.net/movie/{self.movie_id}")
+        response = self._send_request("get", f"https://m.aebn.net/movie/{self.movie_id}")
         html_tree = html.fromstring(response.content)
         scene_elems = html_tree.xpath('//div[@class="scroller"]')
         for scene_el in scene_elems:
@@ -314,7 +328,7 @@ class Movie:
             raise Exception("ffmpeg not found! please add it to PATH, or provide it's directory as a parameter")
 
     def _time_string_to_seconds(self, time_string):
-        time_parts = list(map(int, time_string.split(':')))
+        time_parts = list(map(int, time_string.split(":")))
         time_parts.reverse()  # Reverse the list to start from seconds
         total_seconds = 0
         for i, part in enumerate(time_parts):
@@ -328,7 +342,7 @@ class Movie:
 
     def _get_manifest_content(self):
         # Make HTTP request to get the manifest
-        response = self._send_request('get', self.manifest_url)
+        response = self._send_request("get", self.manifest_url)
         self.manifest_content = response.content
 
     def _get_new_manifest_url(self):
@@ -336,18 +350,18 @@ class Movie:
         headers["content-type"] = "application/x-www-form-urlencoded"
         data = f"movieId={self.movie_id}&isPreview=true&format=DASH"
         url = f"https://{self.url_content_type}.aebn.com/{self.url_content_type}/deliver"
-        content = self._send_request('post', url, headers=headers, data=data).json()
+        content = self._send_request("post", url, headers=headers, data=data).json()
         self.manifest_url = content["url"]
         self.logger.debug(f"Manifest URL: {self.manifest_url}")
-        self.base_stream_url = self.manifest_url.rsplit('/', 1)[0]
+        self.base_stream_url = self.manifest_url.rsplit("/", 1)[0]
 
     def _sort_streams_by_video_height(self, video_stream_elements):
-        video_streams = [(element.get('id'), int(element.get('height'))) for element in video_stream_elements]
+        video_streams = [(element.get("id"), int(element.get("height"))) for element in video_stream_elements]
         sorted_video_streams = sorted(video_streams, key=lambda video_stream: video_stream[1])
         return sorted_video_streams
 
     def _is_valid_media(self, media_bytes):
-        cmd = 'ffmpeg -f mp4 -i pipe:0 -f null -'
+        cmd = "ffmpeg -f mp4 -i pipe:0 -f null -"
 
         # Use subprocess.Popen with PIPE to create a pipe for input
         process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -380,10 +394,10 @@ class Movie:
         video_streams = self._sort_streams_by_video_height(video_adaptation_sets)
         streams_res_string = " ".join(str(video_stream[1]) for video_stream in video_streams)
         self.logger.info(f"Available video streams: {streams_res_string}")
-        if self.target_stream and self.target_stream == 'audio' or not self.target_stream:
+        if self.target_stream and self.target_stream == "audio" or not self.target_stream:
             audio_stream_id = self._find_best_good_audio_stream(video_streams)
             self.audio_stream = self._Media_stream("audio", audio_stream_id, self.movie_work_dir)
-        if self.target_stream and self.target_stream == 'video' or not self.target_stream:
+        if self.target_stream and self.target_stream == "video" or not self.target_stream:
             if self.target_height == 0:
                 video_stream_id, self.target_height = video_streams[0]
             elif self.target_height is None:
@@ -440,9 +454,7 @@ class Movie:
                 continue
             self.logger.debug(f"Downloading {stream.human_name} stream ID: {stream.id}")
             # downloading init segment
-            init_segment_bytes = self._download_segment(stream.type, stream.id,
-                                                        overwrite=self.overwrite_existing_files,
-                                                        media_stream=stream)
+            init_segment_bytes = self._download_segment(stream.type, stream.id, overwrite=self.overwrite_existing_files, media_stream=stream)
 
             # using tqdm object so we can manipulate progress
             # and display it as init segment was part of the loop
@@ -451,18 +463,13 @@ class Movie:
             download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
             download_bar.update()  # increment by 1
             for current_segment_number in segments_to_download:
-                data_segment_bytes = self._download_segment(stream.type, stream.id,
-                                                            segment_number=current_segment_number,
-                                                            overwrite=self.overwrite_existing_files,
-                                                            media_stream=stream)
+                data_segment_bytes = self._download_segment(stream.type, stream.id, segment_number=current_segment_number, overwrite=self.overwrite_existing_files, media_stream=stream)
 
                 if self.segment_validity_check and data_segment_bytes:
                     # slow
                     if not self._is_valid_media(init_segment_bytes + data_segment_bytes):
                         self.logger.info(f"{stream.human_name.capitalize()} segment {current_segment_number} media error")
-                        data_segment_bytes = self._download_segment(stream.type, stream.id,
-                                                                    segment_number=current_segment_number,
-                                                                    overwrite=True)
+                        data_segment_bytes = self._download_segment(stream.type, stream.id, segment_number=current_segment_number, overwrite=True)
                         if not self._is_valid_media(init_segment_bytes + data_segment_bytes):
                             raise Exception(f"{stream.type}_{stream.id}_{current_segment_number} Segment not valid!")
 
@@ -480,7 +487,7 @@ class Movie:
         if os.path.exists(segment_path) and not overwrite:
             self.logger.debug(f"{segment_name} found on disk")
             media_stream.downloaded_segments.append(segment_path) if media_stream else None
-            with open(segment_path, 'rb') as segment_file:
+            with open(segment_path, "rb") as segment_file:
                 segment_bytes = segment_file.read()
                 segment_file.close()
                 return segment_bytes
@@ -489,7 +496,7 @@ class Movie:
         tries = 0
         while response is None and tries < max_tries:
             try:
-                response = self._send_request('get', segment_url)
+                response = self._send_request("get", segment_url)
             except Exception as e:
                 self.logger.debug("Segment download error: {}".format(e))
                 self._create_new_session(use_proxies=not self.proxy_metadata_only)
@@ -502,7 +509,7 @@ class Movie:
                 if save_to_disk:
                     if not os.path.exists(self.work_dir):
                         os.mkdir(self.work_dir)
-                    with open(segment_path, 'wb') as f:
+                    with open(segment_path, "wb") as f:
                         f.write(response.content)
                     media_stream.downloaded_segments.append(segment_path) if media_stream else None
                     self.logger.debug(f"{segment_name} saved to disk")
@@ -533,9 +540,9 @@ class Movie:
     def _join_files(self, files, output_path, tqdm_desc):
         # concats segments into a single file
         join_bar = tqdm(files, desc=f"Joining {tqdm_desc}", disable=self.is_silent)
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             for segment_file_path in files:
-                with open(segment_file_path, 'rb') as segment_file:
+                with open(segment_file_path, "rb") as segment_file:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
