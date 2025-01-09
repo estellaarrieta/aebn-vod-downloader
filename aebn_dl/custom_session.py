@@ -5,8 +5,12 @@ from typing import Optional
 
 from curl_cffi import requests as cc_requests
 
+from .exceptions import NetworkError
+
 
 class CustomSession(cc_requests.Session):
+    """Custom curl_cffi session with retries"""
+
     def __init__(self, max_retries: Optional[int] = 3, initial_retry_delay: Optional[int] = 1, backoff_factor: Optional[int] = 2, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_retries = max_retries
@@ -19,10 +23,10 @@ class CustomSession(cc_requests.Session):
         while attempt < self.max_retries:
             try:
                 return super().request(method, url, *args, **kwargs)
-            except cc_requests.RequestsError:
+            except cc_requests.RequestsError as e:
                 attempt += 1
                 if attempt >= self.max_retries:
-                    raise
+                    raise NetworkError from e
                 # Calculate the backoff delay
                 backoff_delay = self.initial_retry_delay * (self.backoff_factor ** (attempt - 1))
                 backoff_delay += random.uniform(0, 1)  # Adding randomness for jitter
