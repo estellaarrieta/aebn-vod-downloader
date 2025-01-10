@@ -21,7 +21,7 @@ def download_movie(args):
         download_covers=args.covers,
         overwrite_existing_files=args.overwrite,
         target_stream=args.target_stream,
-        keep_segments_after_download=args.keep,
+        keep_segments_after_download=args.keep_segments,
         aggressive_segment_cleaning=args.aggressive_cleaning,
         log_level=args.log_level,
         keep_logs=args.keep_logs,
