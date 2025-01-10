@@ -267,6 +267,7 @@ class Downloader:
                 self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
             except Forbidden:
                 self.manifest.process_manifest()
+                self.logger.debug("Manifest refreshed")
                 self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
             download_bar.update()
         download_bar.close()
