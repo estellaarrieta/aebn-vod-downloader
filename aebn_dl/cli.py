@@ -109,13 +109,16 @@ def main():
     parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")
     parser.add_argument("-w", "--work_dir", type=str, help="Specify the work diretory to store downloaded temporary segments in")
     parser.add_argument("-r", "--resolution", type=int, help="Desired video resolution by pixel height. If not found, the nearest lower resolution will be used. Use 0 to select the lowest available resolution. (default: highest available)")
-    parser.add_argument("-rf", "--force-resolution", action="store_true", help="If the target resolution not available, exit with an error")
+    parser.add_argument("-f", "--force-resolution", action="store_true", help="If the target resolution not available, exit with an error")
     parser.add_argument("-n", "--names", action="store_true", help="Include performer names in the output filename")
-    parser.add_argument("-sn", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
+    parser.add_argument("-s", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
+    parser.add_argument("-p", "--proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
+    parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
     parser.add_argument("-c", "--covers", action="store_true", help="Download front and back covers")
     parser.add_argument("-ow", "--overwrite", action="store_true", help="Overwrite existing audio and video segments, if already present")
     parser.add_argument("-ts", "--target-stream", choices=["audio", "video"], help="Download just video or just audio stream")
-    parser.add_argument("-k", "--keep", action="store_true", help="Keep audio and video segments after downloading")
+    parser.add_argument("-ks", "--keep-segments", action="store_true", help="Keep audio and video segments after downloading")
+    parser.add_argument("-kl", "--keep-logs", action="store_true", help="Keep logs after successful exit")
     parser.add_argument(
         "-ac",
         "--aggressive-cleaning",
@@ -125,11 +128,8 @@ def main():
         "If you are really low on disk space, you can use this option but"
         "in case of muxing error you would have to download it all again",
     )
-    parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Set the logging level (default: INFO) Any level above INFO would also disable progress bars")
-    parser.add_argument("-kl", "--keep-logs", action="store_true", help="Keep logs after successful exit")
     parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads with list.txt (default=5)")
-    parser.add_argument("-proxy", type=str, help="Proxy to use (format: protocol://username:password@ip:port)")
-    parser.add_argument("-pm", "--proxy-metadata", action="store_true", help="Use proxies for metadata only, and not for downloading")
+    parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Set the logging level (default: INFO) Any level above INFO would also disable progress bars")
     args = parser.parse_args()
 
     # validate the url
