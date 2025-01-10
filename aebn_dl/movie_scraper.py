@@ -28,6 +28,7 @@ class Movie:
         self.url_content_type = self.input_url.split("/")[3]
         self.movie_id = self.input_url.split("/")[5]
         self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
+        self.studio_name = self.studio_name.replace(",", "")
         self.title = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
         total_duration_string = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
         self.total_duration_seconds = utils.duration_to_seconds(total_duration_string)
