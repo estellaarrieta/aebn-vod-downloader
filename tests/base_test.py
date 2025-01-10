@@ -1,5 +1,5 @@
 import unittest
-from aebn_dl.movie import Downloader
+from aebn_dl import Downloader
 
 
 class DownloadTest(unittest.TestCase):
@@ -12,6 +12,7 @@ class DownloadTest(unittest.TestCase):
             url=self.url,
             proxy=self.proxy,
             download_covers=True,
+            target_height=0,
             log_level="DEBUG",
         ).run()
 

@@ -7,7 +7,7 @@ import sys
 from urllib.parse import urlparse
 from typing import Literal
 
-from .movie import Downloader
+from . import Downloader
 
 
 def download_movie(args):

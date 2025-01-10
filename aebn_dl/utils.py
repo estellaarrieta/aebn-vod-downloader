@@ -5,9 +5,9 @@ import shutil
 import os
 import sys
 
-from .exceptions import FFmpegError
-
 from tqdm import tqdm
+
+from .exceptions import FFmpegError
 
 
 def remove_chars(text: str) -> str:

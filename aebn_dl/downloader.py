@@ -240,7 +240,8 @@ class Downloader:
             except IndexError as e:
                 raise IndexError(f"Scene {self.scene_n} not found!") from e
         else:
-            segment_range = (0, self.manifest.total_number_of_data_segments)
+            # segment_range = (0, self.manifest.total_number_of_data_segments)
+            segment_range = (self.manifest.total_number_of_data_segments - 50, self.manifest.total_number_of_data_segments)
 
         self.logger.info(f"Downloading segments {segment_range[0]} - {segment_range[1]}")
 
