@@ -6,13 +6,12 @@ import os
 import time
 from typing import Literal, Optional
 
-
 from tqdm import tqdm
 
 from . import utils
 from .custom_session import CustomSession
 from .models import MediaStream
-from .movie_scraper import MovieScraper
+from .movie_scraper import Movie
 from .manifest_parser import Manifest
 from .exceptions import Forbidden
 
@@ -80,6 +79,22 @@ class Downloader:
         self.manifest: Manifest = None
         self.session: CustomSession = None
 
+    def run(self) -> None:
+        """Executes the movie download process."""
+        self._initialize_download()
+        scraped_movie = self._scrape_movie_info()
+        self._process_manifest(scraped_movie)
+        output_file_name = self._generate_output_name(scraped_movie)
+        self._create_dirs(scraped_movie.movie_id)
+        self._set_stream_paths()
+        if self.download_covers:
+            self._download_movie_covers(scraped_movie)
+        output_path = os.path.join(self.output_dir, output_file_name)
+        self.logger.info(f"Output file name: {output_file_name}")
+        self._download_streams(scraped_movie)
+        self._process_streams(output_path)
+        self._cleanup()
+
     def _init_new_session(self, use_proxies=True) -> None:
         """Init new curl_cffi session"""
         self.session = CustomSession(impersonate="chrome")
@@ -116,7 +131,7 @@ class Downloader:
         self.logger.info(f"Proxy: {self.proxy}")
         self.logger.info(f"Output dir: {self.output_dir}")
         self.logger.info(f"Work dir: {self.work_dir}")
-        self.logger.info(f"Target stream: {self.target_stream or 'not set'}")
+        self.logger.info(f"Target stream: {self.target_stream or 'both'}")
         if self.aggressive_segment_cleaning:
             self.logger.info("Aggressive cleanup enabled, segments will be deleted before stream muxing")
         if self.target_height is None:
@@ -126,11 +141,13 @@ class Downloader:
         elif self.target_height == 0:
             self.logger.info("Target resolution: Lowest")
 
-    def _generate_output_name(self, scraped_movie: MovieScraper) -> str:
+    def _generate_output_name(self, scraped_movie: Movie) -> str:
         """Generate output file name from movie metadata"""
         output_file_name = []
         if self.target_stream:
             output_file_name.append(f"[{self.target_stream}]")
+        output_file_name.append(scraped_movie.studio_name)
+        output_file_name.append("-")
         output_file_name.append(scraped_movie.title)
         if self.scene_n:
             output_file_name.append(f"Scene {self.scene_n}")
@@ -146,49 +163,90 @@ class Downloader:
             output_file_name.append(f"{self.manifest.video_stream.height}p")
         return " ".join(filter(None, output_file_name)) + ".mp4"
 
-    def run(self) -> None:
-        """Run movie download"""
-        self._log_init_state()
-        utils.ffmpeg_check()
-        self._init_new_session()
-        self.logger.info("Scraping movie info")
-        scraped_movie = MovieScraper(self.input_url, self.session)
-        self.logger.info("Processing manifest")
-        self.manifest = Manifest(self.input_url, scraped_movie.total_duration_seconds, self.session, target_height=self.target_height, force_resolution=self.force_resolution)
-        self.manifest.process_manifest()
-        scraped_movie.calculate_scenes_boundaries(self.manifest.segment_duration)
-        output_file_name = self._generate_output_name(scraped_movie)
-        self._create_dirs(scraped_movie.movie_id)
-        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            stream.path = os.path.join(self.movie_work_dir, f"{stream.media_type}_{stream.stream_id}.mp4")
-        if self.download_covers:
-            self._download_cover(scraped_movie.title, scraped_movie.cover_url_front, front=True)
-            self._download_cover(scraped_movie.title, scraped_movie.cover_url_back, front=False)
-        output_path = os.path.join(self.output_dir, output_file_name)
-        self.logger.info(f"Output file name: {output_file_name}")
-        self._download_streams(scraped_movie)
-        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            if stream.human_name == self.target_stream or not self.target_stream:
-                self._process_stream(stream)
-        if not self.target_stream:
-            self.logger.info("Muxing streams with ffmpeg")
-            utils.ffmpeg_mux_streams(self.manifest.audio_stream.path, self.manifest.video_stream.path, output_path)
-            self.logger.info("Muxing success")
-        else:
-            for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-                if stream.human_name == self.target_stream:
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
-                    os.rename(stream.path, output_path)
-
+    def _cleanup(self) -> None:
+        """Cleans up the work directory and potentially deletes logs."""
         self._work_folder_cleanup()
         if not self.keep_logs:
             self._delete_log()
+
+    def _concat_stream(self, stream: MediaStream) -> None:
+        """Concat stream segments into a single file"""
+        if os.path.exists(stream.path):
+            os.remove(stream.path)
+        utils.concat_segments(
+            files=stream.downloaded_segments,
+            output_path=stream.path,
+            tqdm_desc=f"{stream.human_name} segments",
+            aggressive_cleaning=self.aggressive_segment_cleaning,
+            silent=self.is_silent,
+        )
+
+    def _concat_streams(self) -> None:
+        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
+            if stream.human_name == self.target_stream or not self.target_stream:
+                self._concat_stream(stream)
+
+    def _process_streams(self, output_path: str) -> None:
+        """Processes the downloaded streams, concatinating, and either muxing or renaming based on target stream."""
+        self._concat_streams()
+        if not self.target_stream:
+            self._mux_streams(output_path)
+        else:
+            self._rename_stream(output_path)
+
+    def _mux_streams(self, output_path: str) -> None:
+        """Muxes audio and video streams using ffmpeg."""
+        self.logger.info("Muxing streams with ffmpeg")
+        utils.ffmpeg_mux_streams(self.manifest.audio_stream.path, self.manifest.video_stream.path, output_path)
+        self.logger.info("Muxing success")
+
+    def _rename_stream(self, output_path: str) -> None:
+        """Renames the target stream to the output path."""
+        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
+            if stream.human_name == self.target_stream:
+                if os.path.exists(output_path):
+                    os.remove(output_path)
+                os.rename(stream.path, output_path)
+
+    def _download_movie_covers(self, scraped_movie: Movie) -> None:
+        """Downloads the movie covers."""
+        full_name = f"{scraped_movie.studio_name} - {scraped_movie.title}"
+        self._download_cover(full_name, scraped_movie.cover_url_front, front=True)
+        self._download_cover(full_name, scraped_movie.cover_url_back, front=False)
+
+    def _set_stream_paths(self) -> None:
+        """Sets the file paths for the audio and video streams."""
+        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
+            stream.path = os.path.join(self.movie_work_dir, f"{stream.media_type}_{stream.stream_id}.mp4")
 
     def _create_dirs(self, movie_id: str) -> None:
         os.makedirs(self.output_dir, exist_ok=True)
         self.movie_work_dir = os.path.join(self.work_dir, movie_id)
         os.makedirs(self.movie_work_dir, exist_ok=True)
+
+    def _process_manifest(self, scraped_movie: Movie) -> None:
+        """Processes the movie manifest."""
+        self.logger.info("Processing manifest")
+        self.manifest = Manifest(
+            self.input_url,
+            scraped_movie.total_duration_seconds,
+            self.session,
+            target_height=self.target_height,
+            force_resolution=self.force_resolution,
+        )
+        self.manifest.process_manifest()
+        scraped_movie.calculate_scenes_boundaries(self.manifest.segment_duration)
+
+    def _scrape_movie_info(self) -> Movie:
+        """Scrapes movie information from the input URL."""
+        self.logger.info("Scraping movie info")
+        return Movie(self.input_url, self.session)
+
+    def _initialize_download(self) -> None:
+        """Initializes the download process, checks for ffmpeg, and initializes a new session."""
+        self._log_init_state()
+        utils.ffmpeg_check()
+        self._init_new_session()
 
     def _download_cover(self, movie_title: str, cover_url: str, front: bool) -> None:
         """Save cover image to disk with server timestamp"""
@@ -227,7 +285,7 @@ class Downloader:
         if not os.listdir(self.movie_work_dir):
             os.rmdir(self.movie_work_dir)
 
-    def _download_streams(self, scraped_movie: MovieScraper) -> None:
+    def _download_streams(self, scraped_movie: Movie) -> None:
         """Download movie streams"""
         if self.proxy and self.proxy_metadata_only:
             # disable proxies in session
@@ -256,7 +314,7 @@ class Downloader:
         # downloading init segment
         self._download_segment(stream, overwrite=self.overwrite_existing_files)
 
-        # using tqdm object so we can manipulate progress
+        # using tqdm object to manipulate progress
         # and display it as init segment was part of the loop
 
         segments_to_download = range(segment_range[0], segment_range[1] + 1)
@@ -301,15 +359,3 @@ class Downloader:
             raise Forbidden
         else:
             raise RuntimeError(f"{segment_name} Download error! Response Status : {response.status_code}")
-
-    def _process_stream(self, stream: MediaStream) -> None:
-        """Concat stream segments into a single file"""
-        if os.path.exists(stream.path):
-            os.remove(stream.path)
-        utils.concat_segments(
-            files=stream.downloaded_segments,
-            output_path=stream.path,
-            tqdm_desc=f"{stream.human_name} segments",
-            aggressive_cleaning=self.aggressive_segment_cleaning,
-            silent=self.is_silent,
-        )

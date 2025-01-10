@@ -6,7 +6,7 @@ from .models import Scene
 from .custom_session import CustomSession
 
 
-class MovieScraper:
+class Movie:
     def __init__(self, url: str, session: CustomSession):
         self.input_url = url
         self.session = session
