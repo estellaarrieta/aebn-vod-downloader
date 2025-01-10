@@ -20,7 +20,6 @@ class Manifest:
         self.video_stream: VideoStream = None
         self.audio_stream: AudioStream = None
         self.avaliable_resulutions: list[int] = None
-        self._process_manifest()
 
     def parse_content(self, manifest_content: str) -> None:
         """Parse the XML manifest content"""
@@ -92,7 +91,7 @@ class Manifest:
         content = self.session.post(url, headers=headers, data=data).json()
         return content["url"]
 
-    def _process_manifest(self):
+    def process_manifest(self):
         manifest_url = self._get_new_manifest_url()
         self.base_stream_url = manifest_url.rsplit("/", 1)[0]
         manifest_content = self.session.get(manifest_url).content

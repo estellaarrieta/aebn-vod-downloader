@@ -14,6 +14,7 @@ from .custom_session import CustomSession
 from .models import MediaStream
 from .movie_scraper import MovieScraper
 from .manifest_parser import Manifest
+from .exceptions import Forbidden
 
 
 class Downloader:
@@ -110,7 +111,7 @@ class Downloader:
 
     def _log_init_state(self) -> None:
         """Log input arguments"""
-        self.logger.info(f"Version: {utils.get_version() or 'unknown'}")
+        self.logger.info(f"Version: {'v'+utils.get_version() or 'unknown'}")
         self.logger.info(f"Input URL: {self.input_url}")
         self.logger.info(f"Proxy: {self.proxy}")
         self.logger.info(f"Output dir: {self.output_dir}")
@@ -154,6 +155,7 @@ class Downloader:
         scraped_movie = MovieScraper(self.input_url, self.session)
         self.logger.info("Processing manifest")
         self.manifest = Manifest(self.input_url, scraped_movie.total_duration_seconds, self.session, target_height=self.target_height, force_resolution=self.force_resolution)
+        self.manifest.process_manifest()
         scraped_movie.calculate_scenes_boundaries(self.manifest.segment_duration)
         output_file_name = self._generate_output_name(scraped_movie)
         self._create_dirs(scraped_movie.movie_id)
@@ -261,7 +263,11 @@ class Downloader:
         download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
         download_bar.update()  # increment by 1
         for i in segments_to_download:
-            self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
+            try:
+                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
+            except Forbidden:
+                self.manifest.process_manifest()
+                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
             download_bar.update()
         download_bar.close()
 
@@ -290,6 +296,8 @@ class Downloader:
             # just skip if the last segment does not exist
             # segment calc returns a rounded up float which is sometimes bigger than the actual number of segments
             self.logger.debug("Last segment is 404, skipping")
+        elif response.status_code == 403:
+            raise Forbidden
         else:
             raise RuntimeError(f"{segment_name} Download error! Response Status : {response.status_code}")
 
