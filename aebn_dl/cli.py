@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 import concurrent.futures
 import logging
@@ -137,10 +136,11 @@ def main():
     result = urlparse(args.url)
     if result.scheme and result.netloc:
         download_movie(args)
+        return
 
     main_logger = new_logger(args.log_level)
 
-    # if missing or invalid, check for a list.txt and download concurrently
+    # if invalid, check for a list.txt and download concurrently
     if args.url == "list.txt":
         process_list_txt(main_logger, args=args)
     else:
