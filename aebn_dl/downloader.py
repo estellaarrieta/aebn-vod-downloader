@@ -111,7 +111,7 @@ class Downloader:
 
     def _log_init_state(self) -> None:
         """Log input arguments"""
-        self.logger.info(f"Version: {'v'+utils.get_version() or 'unknown'}")
+        self.logger.info(f"Version: {'v' + utils.get_version() or 'unknown'}")
         self.logger.info(f"Input URL: {self.input_url}")
         self.logger.info(f"Proxy: {self.proxy}")
         self.logger.info(f"Output dir: {self.output_dir}")
@@ -240,8 +240,7 @@ class Downloader:
             except IndexError as e:
                 raise IndexError(f"Scene {self.scene_n} not found!") from e
         else:
-            # segment_range = (0, self.manifest.total_number_of_data_segments)
-            segment_range = (self.manifest.total_number_of_data_segments - 50, self.manifest.total_number_of_data_segments)
+            segment_range = (0, self.manifest.total_number_of_data_segments)
 
         self.logger.info(f"Downloading segments {segment_range[0]} - {segment_range[1]}")
 
