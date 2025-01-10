@@ -126,7 +126,6 @@ class Downloader:
 
     def _log_init_state(self) -> None:
         """Log input arguments"""
-        self.logger.info(f"Version: {'v' + utils.get_version() or 'unknown'}")
         self.logger.info(f"Input URL: {self.input_url}")
         self.logger.info(f"Proxy: {self.proxy}")
         self.logger.info(f"Output dir: {self.output_dir}")

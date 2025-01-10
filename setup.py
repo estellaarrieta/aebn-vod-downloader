@@ -10,7 +10,7 @@ setup(
         "tqdm",
     ],
     extras_require={
-        "dev": ["setuptools", "lxml-stubs"],
+        "dev": ["lxml-stubs"],
     },
     entry_points={"console_scripts": ["aebndl = aebn_dl.cli:main"]},
 )

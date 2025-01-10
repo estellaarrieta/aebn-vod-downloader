@@ -18,17 +18,6 @@ def remove_chars(text: str) -> str:
     return text
 
 
-def get_version() -> str | None:
-    """Get `aebndl` package version"""
-    try:
-        import pkg_resources
-
-        version = pkg_resources.require("aebndl")[0].version
-        return version
-    except Exception:
-        pass
-
-
 def new_logger(name: str, log_level: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)  # Set the logger level to the lowest (DEBUG)
