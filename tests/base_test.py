@@ -20,6 +20,8 @@ class DownloadTest(unittest.TestCase):
             download_covers=True,
             target_height=0,
             log_level="DEBUG",
+            start_segment=0,
+            end_segment=20,
         ).run()
 
 

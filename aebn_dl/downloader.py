@@ -22,6 +22,8 @@ class Downloader:
         url: str,
         target_height: Optional[int] = None,
         scene_n: Optional[int] = None,
+        start_segment: Optional[int] = None,
+        end_segment: Optional[int] = None,
         output_dir: Optional[str] = None,
         work_dir: Optional[str] = None,
         proxy: Optional[str] = None,
@@ -36,12 +38,13 @@ class Downloader:
         log_level: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = "INFO",
         keep_logs: Optional[bool] = False,
     ):
-        """Represents a movie and its associated metadata and processing options.
-
+        """
         Args:
             url: The URL of the movie.
             target_height: The desired height of the movie in pixels.
             scene_n: The scene number of the movie.
+            start_segment: Set the start segment.
+            end_segment: Set the end segment.
             output_dir: The directory where the output file will be saved.
             work_dir: The directory to store temporary files during processing.
             log_level: The logging level ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"). Defaults to "INFO".
@@ -67,6 +70,8 @@ class Downloader:
         self.download_covers = download_covers
         self.overwrite_existing_files = overwrite_existing_files
         self.target_stream = target_stream
+        self.start_segment = start_segment
+        self.end_segment = end_segment
         self.aggressive_segment_cleaning = aggressive_segment_cleaning
         self.keep_segments_after_download = keep_segments_after_download
         self.log_level = log_level
@@ -297,7 +302,9 @@ class Downloader:
             except IndexError as e:
                 raise IndexError(f"Scene {self.scene_n} not found!") from e
         else:
-            segment_range = (0, self.manifest.total_number_of_data_segments)
+            start_segment = self.start_segment or 0
+            end_segment = self.end_segment or self.manifest.total_number_of_data_segments
+            segment_range = (start_segment, end_segment)
 
         self.logger.info(f"Downloading segments {segment_range[0]} - {segment_range[1]}")
 
