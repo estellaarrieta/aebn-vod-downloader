@@ -12,9 +12,9 @@ class Scene:
 
 @dataclass
 class MediaStream:
-    stream_id: str
     human_name: str
     media_type: str
+    stream_id: str = field(init=False)
     path: str = field(init=False)
     downloaded_segments: list[str] = field(default_factory=list)
 
