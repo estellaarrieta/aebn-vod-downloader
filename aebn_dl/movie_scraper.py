@@ -27,8 +27,7 @@ class Movie:
         content = html.fromstring(self.session.get(self.input_url).content)
         self.url_content_type = self.input_url.split("/")[3]
         self.movie_id = self.input_url.split("/")[5]
-        self.studio_name = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')[0].strip()
-        self.studio_name = self.studio_name.replace(",", "")
+        self.studio_name = self._extract_studio_name(content)
         self.title = content.xpath('//*[@class="dts-section-page-heading-title"]/h1/text()')[0].strip()
         total_duration_string = content.xpath('//*[@class="section-detail-list-item-duration"][2]/text()')[0].strip()
         self.total_duration_seconds = utils.duration_to_seconds(total_duration_string)
@@ -43,6 +42,12 @@ class Movie:
         self.cover_url_front = "https:" + cover_front.split("?")[0]
         cover_back = content.xpath('//*[@class="dts-movie-boxcover-back"]//img/@src')[0].strip()
         self.cover_url_back = "https:" + cover_back.split("?")[0]
+
+    def _extract_studio_name(self, content) -> str:
+        studio_names = content.xpath('//*[@class="dts-studio-name-wrapper"]/a/text()')
+        if len(studio_names) > 0:
+            return studio_names[0].replace(",", "").strip()
+        return ""
 
     def calculate_scenes_boundaries(self, segment_duration: float):
         """Calculate scene segment boundaries with data from m.aebn.net"""
