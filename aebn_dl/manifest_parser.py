@@ -29,6 +29,10 @@ class Manifest:
         self.avaliable_resulutions = [video_stream[1] for video_stream in video_streams]
         audio_stream_id = self._find_best_good_audio_stream(video_streams)
         self.audio_stream.stream_id = audio_stream_id
+        self._set_video_stream_data(video_streams)
+
+    def _set_video_stream_data(self, video_streams: list[tuple[str, int]]) -> None:
+        """Set height and steam_id based on target_height"""
         if self.target_height == 0:
             # lowest resolution
             stream_id, height = video_streams[0]
@@ -43,10 +47,9 @@ class Manifest:
             return
         if self.target_height:
             # other resolution
-            video_stream_id = next((sublist[0] for sublist in video_streams if sublist[1] == self.target_height), None)
-            if not video_stream_id and self.force_resolution:
+            stream_id, height = next((sublist for sublist in reversed(video_streams) if sublist[1] <= self.target_height), None)
+            if self.force_resolution and height != self.target_height:
                 raise RuntimeError(f"Target video resolution height {self.target_height} not found")
-            video_stream_id, height = next((sublist for sublist in reversed(video_streams) if sublist[1] <= self.target_height), None)
             self.video_stream.stream_id = stream_id
             self.video_stream.height = height
 
