@@ -34,9 +34,10 @@ class Movie:
         self.studio_name = utils.remove_chars(self.studio_name)
         self.title = utils.remove_chars(self.title)
         self.performers = content.xpath('//section[@id="dtsPanelStarsDetailMovie"]//a/@title')
-        scene_performers_elements = content.xpath('//li[@class="dts-scene-strip-stars"]')
-        for preformers_element in scene_performers_elements:
-            scene = Scene(performers=preformers_element.xpath(".//a/text()"))
+        scene_elements = content.xpath('//section[@id[starts-with(., "scene")]]')
+        for scene_element in scene_elements:
+            scene_performers = scene_element.xpath('.//li[@class="dts-scene-strip-stars"]//a/text()')
+            scene = Scene(performers=scene_performers)
             self.scenes.append(scene)
         cover_front = content.xpath('//*[@class="dts-movie-boxcover-front"]//img/@src')[0].strip()
         self.cover_url_front = "https:" + cover_front.split("?")[0]
