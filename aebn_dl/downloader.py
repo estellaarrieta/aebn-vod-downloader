@@ -338,7 +338,7 @@ class Downloader:
 
     def _download_segment(self, stream: MediaStream, segment_number: Optional[int] = None, overwrite: Optional[bool] = False) -> None:
         """Download and save stream segment"""
-        if segment_number:
+        if isinstance(segment_number, int):
             segment_name = f"{stream.media_type}_{stream.stream_id}_{segment_number}"
         else:
             segment_name = f"{stream.media_type}i_{stream.stream_id}"
