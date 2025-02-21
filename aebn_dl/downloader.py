@@ -27,16 +27,16 @@ class Downloader:
         output_dir: Optional[str] = None,
         work_dir: Optional[str] = None,
         proxy: Optional[str] = None,
-        proxy_metadata_only: Optional[bool] = False,
-        download_covers: Optional[bool] = False,
-        overwrite_existing_files: Optional[bool] = False,
-        target_stream: Optional[Literal["audio", "video", None]] = None,
-        keep_segments_after_download: Optional[bool] = False,
-        aggressive_segment_cleaning: Optional[bool] = False,
-        force_resolution: Optional[bool] = False,
-        include_performer_names: Optional[bool] = False,
-        log_level: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = "INFO",
-        keep_logs: Optional[bool] = False,
+        proxy_metadata_only: bool = False,
+        download_covers: bool = False,
+        overwrite_existing_files: bool = False,
+        target_stream: Literal["audio", "video", None] = None,
+        keep_segments_after_download: bool = False,
+        aggressive_segment_cleaning: bool = False,
+        force_resolution: bool = False,
+        include_performer_names: bool = False,
+        log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+        keep_logs: bool = False,
     ):
         """
         Args:
@@ -80,9 +80,9 @@ class Downloader:
         self.proxy_metadata_only = proxy_metadata_only
         self.logger = utils.new_logger(name=self._movie_logger_name(), log_level=log_level)
         self.is_silent = self.logger.getEffectiveLevel() > logging.INFO
-        self.movie_work_dir: str = None
-        self.manifest: Manifest = None
-        self.session: CustomSession = None
+        self.movie_work_dir: str | None = None
+        self.manifest: Manifest | None = None
+        self.session: CustomSession | None = None
 
     def run(self) -> None:
         """Executes the movie download process."""
@@ -100,7 +100,7 @@ class Downloader:
         self._process_streams(output_path)
         self._cleanup()
 
-    def _init_new_session(self, use_proxies=True) -> None:
+    def _init_new_session(self, use_proxies: bool = True) -> None:
         """Init new curl_cffi session"""
         self.session = CustomSession(impersonate="chrome")
         self.session.timeout = 30

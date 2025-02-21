@@ -14,12 +14,12 @@ class Manifest:
         self.session = session
         self.target_height = target_height
         self.force_resolution = force_resolution
-        self.base_stream_url: str = None
-        self.segment_duration: float = None
-        self.total_number_of_data_segments: int = None
+        self.base_stream_url: str | None = None
+        self.segment_duration: float | None = None
+        self.total_number_of_data_segments: int | None = None
         self.video_stream = VideoStream()
         self.audio_stream = AudioStream()
-        self.avaliable_resulutions: list[int] = None
+        self.avaliable_resulutions: list[int] | None = None
 
     def parse_content(self, manifest_content: str) -> None:
         """Parse the XML manifest content"""

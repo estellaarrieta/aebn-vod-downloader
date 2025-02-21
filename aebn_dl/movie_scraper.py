@@ -10,15 +10,15 @@ class Movie:
     def __init__(self, url: str, session: CustomSession):
         self.input_url = url
         self.session = session
-        self.url_content_type: str = None
-        self.movie_id: str = None
-        self.studio_name: str = None
-        self.title: str = None
-        self.total_duration_seconds: int = None
-        self.performers: list = None
+        self.url_content_type: str | None = None
+        self.movie_id: str | None = None
+        self.studio_name: str | None = None
+        self.title: str | None = None
+        self.total_duration_seconds: int | None = None
+        self.performers: list | None = None
         self.scenes: list[Scene] = []
-        self.cover_url_front: str = None
-        self.cover_url_back: str = None
+        self.cover_url_front: str | None = None
+        self.cover_url_back: str | None = None
         self.scenes_boundaries = []
         self._scrape_info()
 
