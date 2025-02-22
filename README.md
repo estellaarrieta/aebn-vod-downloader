@@ -5,16 +5,12 @@
 
 ## Installation
 
-Install or upgrade the package using pip and git:
-
+```
+pip install https://github.com/estellaarrieta/aebn-vod-downloader/archive/refs/heads/main.zip -U
+```
+Or
 ```
 pip install git+https://github.com/estellaarrieta/aebn-vod-downloader -U
-```
-
-OR download as zip and then intall with pip:
-
-```
-pip install aebn-vod-downloader.zip
 ```
 
 ### Example Usage With Arguments
