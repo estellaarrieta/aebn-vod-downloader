@@ -109,4 +109,4 @@ def is_valid_media(media_bytes: bytes) -> bool:
 def ffmpeg_check() -> None:
     """Ensure ffmpeg is available in PATH"""
     if not shutil.which("ffmpeg"):
-        raise FileNotFoundError("ffmpeg not found! Please add it to PATH or provide its directory as an argument.")
+        raise FileNotFoundError("ffmpeg not found! Please add it to PATH.")
