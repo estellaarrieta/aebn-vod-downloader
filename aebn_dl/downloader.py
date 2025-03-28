@@ -1,6 +1,7 @@
 import datetime
 import email.utils as eut
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import os
 import time
@@ -290,7 +291,7 @@ class Downloader:
             os.rmdir(self.movie_work_dir)
 
     def _download_streams(self, scraped_movie: Movie) -> None:
-        """Download movie streams"""
+        """Download movie streams concurrently"""
         if self.proxy and self.proxy_metadata_only:
             # disable proxies in session
             self.session.proxies = None
@@ -308,11 +309,22 @@ class Downloader:
 
         self.logger.info(f"Downloading segments {segment_range[0]} - {segment_range[1]}")
 
+        # Determine which streams to download
+        streams_to_download = []
         for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            if stream.human_name == self.target_stream:
-                self._download_stream(stream, segment_range)
-            elif not self.target_stream:
-                self._download_stream(stream, segment_range)
+            if stream.human_name == self.target_stream or not self.target_stream:
+                streams_to_download.append(stream)
+
+        # Download streams in parallel
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(self._download_stream, stream, segment_range): stream for stream in streams_to_download}
+            for future in as_completed(futures):
+                stream = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    self.logger.error(f"Failed to download {stream.human_name} stream: {str(e)}")
+                    raise
 
     def _download_stream(self, stream: MediaStream, segment_range: tuple[int, int]) -> None:
         """Download stream segments in given range"""
