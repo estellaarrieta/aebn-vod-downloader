@@ -7,7 +7,7 @@ import os
 import time
 from typing import Literal
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from . import utils
 from .custom_session import CustomSession
