@@ -1,5 +1,4 @@
 import math
-from typing import Optional
 import lxml.etree as ET
 
 from . import utils
@@ -8,7 +7,7 @@ from .custom_session import CustomSession
 
 
 class Manifest:
-    def __init__(self, url: str, total_duration_seconds: int, session: CustomSession, target_height: Optional[int] = 1, force_resolution: Optional[bool] = False):
+    def __init__(self, url: str, total_duration_seconds: int, session: CustomSession, target_height: int = 1, force_resolution: bool = False):
         self.input_url = url
         self.total_duration_seconds = total_duration_seconds
         self.session = session

@@ -4,7 +4,7 @@ import logging
 
 import os
 import time
-from typing import Literal, Optional
+from typing import Literal
 
 from tqdm import tqdm
 
@@ -20,13 +20,13 @@ class Downloader:
     def __init__(
         self,
         url: str,
-        target_height: Optional[int] = None,
-        scene_n: Optional[int] = None,
-        start_segment: Optional[int] = None,
-        end_segment: Optional[int] = None,
-        output_dir: Optional[str] = None,
-        work_dir: Optional[str] = None,
-        proxy: Optional[str] = None,
+        target_height: int | None = None,
+        scene_n: int | None = None,
+        start_segment: int = 0,
+        end_segment: int | None = None,
+        output_dir: str = "",
+        work_dir: str = "",
+        proxy: str = "",
         proxy_metadata_only: bool = False,
         download_covers: bool = False,
         overwrite_existing_files: bool = False,
@@ -336,7 +336,7 @@ class Downloader:
             download_bar.update()
         download_bar.close()
 
-    def _download_segment(self, stream: MediaStream, segment_number: Optional[int] = None, overwrite: Optional[bool] = False) -> None:
+    def _download_segment(self, stream: MediaStream, segment_number: int | None = None, overwrite: bool = False) -> None:
         """Download and save stream segment"""
         if isinstance(segment_number, int):
             segment_name = f"{stream.media_type}_{stream.stream_id}_{segment_number}"

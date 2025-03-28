@@ -1,6 +1,5 @@
 import logging
 import subprocess
-from typing import Optional
 import shutil
 import os
 import sys
@@ -62,20 +61,20 @@ def duration_to_seconds(duration: str) -> int:
     return total_seconds
 
 
-def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str, ffmpeg_dir: Optional[str] = None, silent: bool = False) -> None:
+def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str, silent: bool = False) -> None:
     """Mux two media streams with ffmpeg"""
     cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}"'
 
     if silent:
         cmd += " -loglevel warning"
 
-    out = subprocess.run(cmd, shell=True, cwd=ffmpeg_dir, capture_output=True, text=True, check=False)
+    out = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
 
     if not out.returncode == 0:
         raise FFmpegError(out.stderr)
 
 
-def concat_segments(files, output_path, tqdm_desc, aggressive_cleaning: bool, silent=False):
+def concat_segments(files, output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
     """Concat segments into a single file"""
     concat_progress = tqdm(files, desc=f"Joining {tqdm_desc}", disable=silent)
     with open(output_path, "wb") as f:
