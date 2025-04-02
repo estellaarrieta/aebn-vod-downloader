@@ -138,6 +138,7 @@ class Downloader:
         """Log input arguments"""
         self.logger.info(f"Input URL: {self.input_url}")
         self.logger.info(f"Proxy: {self.proxy}")
+        self.logger.info(f"Threads: {self.threads}")
         self.logger.info(f"Output dir: {self.output_dir}")
         self.logger.info(f"Work dir: {self.work_dir}")
         self.logger.info(f"Target stream: {self.target_stream or 'both'}")
