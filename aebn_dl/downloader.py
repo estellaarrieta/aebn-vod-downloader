@@ -184,7 +184,7 @@ class Downloader:
         if os.path.exists(stream.path):
             os.remove(stream.path)
         utils.concat_segments(
-            files=[stream.downloaded_segments[0], *sorted(stream.downloaded_segments[1:])],  # sorting segment paths
+            files=stream.downloaded_segments,
             output_path=stream.path,
             tqdm_desc=f"{stream.human_name} segments",
             aggressive_cleaning=self.aggressive_segment_cleaning,
