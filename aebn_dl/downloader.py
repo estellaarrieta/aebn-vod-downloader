@@ -362,9 +362,7 @@ class Downloader:
                     self._download_segment(stream, segment_number=segment_num)
             return segment_num
 
-        max_workers = min(self.threads, len(segments_to_download))
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = {executor.submit(download_task, i): i for i in segments_to_download}
 
             for future in as_completed(futures):
