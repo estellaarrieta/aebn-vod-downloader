@@ -14,6 +14,7 @@ def download_movie(args):
         target_height=args.resolution,
         force_resolution=args.force_resolution,
         include_performer_names=args.names,
+        no_metadata=args.no_metadata,
         scene_n=args.scene,
         start_segment=args.start_segment,
         end_segment=args.end_segment,
@@ -75,6 +76,7 @@ def main():
     parser.add_argument("-r", "--resolution", type=int, help="Desired video resolution by pixel height. If not found, the nearest lower resolution will be used. Use 0 to select the lowest available resolution. (default: highest available)")
     parser.add_argument("-f", "--force-resolution", action="store_true", help="If the target resolution not available, exit with an error")
     parser.add_argument("-n", "--names", action="store_true", help="Include performer names in the output filename")
+    parser.add_argument("-nm", "--no-metadata", action="store_true", help="Disable adding title and chapter markers to the output video")
     parser.add_argument("-s", "--scene", type=int, help="Download a single scene using the relevant scene number on AEBN")
     parser.add_argument("-ss", "--start-segment", type=int, help="Specify the start segment")
     parser.add_argument("-es", "--end-segment", type=int, help="Specify the end segment")

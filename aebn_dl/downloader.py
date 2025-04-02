@@ -38,6 +38,7 @@ class Downloader:
         aggressive_segment_cleaning: bool = False,
         force_resolution: bool = False,
         include_performer_names: bool = False,
+        no_metadata: bool = False,
         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
         keep_logs: bool = False,
     ):
@@ -61,6 +62,7 @@ class Downloader:
             aggressive_segment_cleaning: If True, aggressively clean up segments during processing. Defaults to False.
             force_resolution: If True, force the specified resolution even if it's not available. Defaults to False.
             include_performer_names: If True, include performer names in the output file name. Defaults to False.
+            no_metadata: Disable adding title and chapter markers to the output video. Defaults to False.
             keep_logs: If True, keep log files after processing. Defaults to False.
         """
 
@@ -70,6 +72,7 @@ class Downloader:
         self.target_height = target_height
         self.force_resolution = force_resolution
         self.include_performer_names = include_performer_names
+        self.no_metadata = no_metadata
         self.scene_n = scene_n
         self.download_covers = download_covers
         self.overwrite_existing_files = overwrite_existing_files
@@ -103,6 +106,8 @@ class Downloader:
         self.logger.info(f"Output file name: {output_file_name}")
         self._download_streams(scraped_movie)
         self._process_streams(output_path)
+        if not self.no_metadata:
+            utils.add_metadata(output_path, scraped_movie)
         self._cleanup()
 
     def _init_new_session(self, use_proxies: bool = True) -> None:
