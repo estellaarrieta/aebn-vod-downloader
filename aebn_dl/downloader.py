@@ -2,6 +2,7 @@ import datetime
 import email.utils as eut
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 import os
 import time
@@ -187,9 +188,19 @@ class Downloader:
         )
 
     def _concat_streams(self) -> None:
-        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            if stream.human_name == self.target_stream or not self.target_stream:
-                self._concat_stream(stream)
+        """Concatenate streams concurrently using thread pool"""
+        streams_to_concat = [stream for stream in (self.manifest.audio_stream, self.manifest.video_stream) if stream.human_name == self.target_stream or not self.target_stream]
+
+        # Use ThreadPoolExecutor to concatenate streams in parallel
+        with ThreadPoolExecutor(max_workers=len(streams_to_concat)) as executor:
+            futures = []
+            for stream in streams_to_concat:
+                future = executor.submit(self._concat_stream, stream)
+                futures.append(future)
+
+            # Wait for all concatenation operations to complete
+            for future in futures:
+                future.result()  # This will raise any exceptions that occurred
 
     def _process_streams(self, output_path: str) -> None:
         """Processes the downloaded streams, concatinating, and either muxing or renaming based on target stream."""
@@ -327,25 +338,42 @@ class Downloader:
                     raise
 
     def _download_stream(self, stream: MediaStream, segment_range: tuple[int, int]) -> None:
-        """Download stream segments in given range"""
+        """Download stream segments in given range using threadpool"""
         self.logger.debug(f"Downloading {stream.human_name} stream ID: {stream.stream_id}")
-        # downloading init segment
-        self._download_segment(stream, overwrite=self.overwrite_existing_files)
 
-        # using tqdm object to manipulate progress
-        # and display it as init segment was part of the loop
+        # Download init segment (single thread)
+        self._download_segment(stream, overwrite=self.overwrite_existing_files)
 
         segments_to_download = range(segment_range[0], segment_range[1] + 1)
         download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
-        download_bar.update()  # increment by 1
-        for i in segments_to_download:
+        download_bar.update()  # increment by 1 for init segment
+
+        # Lock for thread-safe manifest refresh
+        manifest_lock = Lock()
+
+        def download_task(segment_num):
             try:
-                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
+                self._download_segment(stream, segment_number=segment_num, overwrite=self.overwrite_existing_files)
             except Forbidden:
-                self.manifest.process_manifest()
-                self.logger.debug("Manifest refreshed")
-                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
-            download_bar.update()
+                with manifest_lock:
+                    self.manifest.process_manifest()
+                    self.logger.debug("Manifest refreshed")
+                    self._download_segment(stream, segment_number=segment_num, overwrite=self.overwrite_existing_files)
+            return segment_num
+
+        # Create thread pool (adjust max_workers as needed)
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = {executor.submit(download_task, i): i for i in segments_to_download}
+
+            for future in as_completed(futures):
+                try:
+                    future.result()  # This will re-raise any exceptions
+                except Exception as e:
+                    # Handle other potential errors here
+                    self.logger.error(f"Failed to download segment {futures[future]}: {str(e)}")
+                    raise
+                download_bar.update()
+
         download_bar.close()
 
     def _download_segment(self, stream: MediaStream, segment_number: int | None = None, overwrite: bool = False) -> None:
