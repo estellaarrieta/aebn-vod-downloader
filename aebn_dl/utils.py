@@ -74,7 +74,7 @@ def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str,
         raise FFmpegError(out.stderr)
 
 
-def concat_segments(files, output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
+def concat_segments(files: list[str], output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
     """Concat segments into a single file"""
     concat_progress = tqdm(files, desc=f"Joining {tqdm_desc}", disable=silent)
     with open(output_path, "wb") as f:

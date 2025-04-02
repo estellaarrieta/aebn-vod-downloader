@@ -20,7 +20,7 @@ class CustomSession(cc_requests.Session):
     def custom_request(self, method: Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE"], url: str, *args, **kwargs) -> cc_requests.Response:
         """request wrapper with retries"""
         attempt = 0
-        while attempt < self.max_retries:
+        while True:
             try:
                 return super().request(method, url, *args, **kwargs)
             except cc_requests.RequestsError as e:
