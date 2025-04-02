@@ -7,8 +7,6 @@ import sys
 
 from tqdm import tqdm
 
-from .models import Scene
-
 from .exceptions import FFmpegError
 
 

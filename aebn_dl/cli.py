@@ -94,7 +94,7 @@ def main():
         "If you are really low on disk space, you can use this option but"
         "in case of muxing error you would have to download it all again",
     )
-    parser.add_argument("-t", "--threads", type=int,  default=5, help="Threads for concurrent downloads (default=5)")
+    parser.add_argument("-t", "--threads", type=int, default=5, help="Threads for concurrent downloads (default=5)")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Set the logging level (default: INFO) Any level above INFO would also disable progress bars")
     args = parser.parse_args()
 
