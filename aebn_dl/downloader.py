@@ -2,6 +2,7 @@ import datetime
 import email.utils as eut
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 import os
 import time
@@ -28,6 +29,7 @@ class Downloader:
         output_dir: str = "",
         work_dir: str = "",
         proxy: str = "",
+        threads: int = 5,
         proxy_metadata_only: bool = False,
         download_covers: bool = False,
         overwrite_existing_files: bool = False,
@@ -50,6 +52,7 @@ class Downloader:
             work_dir: The directory to store temporary files during processing.
             log_level: The logging level ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"). Defaults to "INFO".
             proxy: The proxy server address to use for network requests.
+            threads: Threads for concurrent downloads. Default 5.
             proxy_metadata_only: If True, use the proxy only for metadata requests, otherwise use it for all requests. Defaults to False.
             download_covers: If True, download cover images. Defaults to False.
             overwrite_existing_files: If True, overwrite existing files in the output directory. Defaults to False.
@@ -78,6 +81,7 @@ class Downloader:
         self.log_level = log_level
         self.keep_logs = keep_logs
         self.proxy = proxy
+        self.threads = threads
         self.proxy_metadata_only = proxy_metadata_only
         self.logger = utils.new_logger(name=self._movie_logger_name(), log_level=log_level)
         self.is_silent = self.logger.getEffectiveLevel() > logging.INFO
@@ -134,6 +138,7 @@ class Downloader:
         """Log input arguments"""
         self.logger.info(f"Input URL: {self.input_url}")
         self.logger.info(f"Proxy: {self.proxy}")
+        self.logger.info(f"Threads: {self.threads}")
         self.logger.info(f"Output dir: {self.output_dir}")
         self.logger.info(f"Work dir: {self.work_dir}")
         self.logger.info(f"Target stream: {self.target_stream or 'both'}")
@@ -187,9 +192,17 @@ class Downloader:
         )
 
     def _concat_streams(self) -> None:
-        for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            if stream.human_name == self.target_stream or not self.target_stream:
-                self._concat_stream(stream)
+        """Concatenate streams concurrently using thread pool"""
+        streams_to_concat = [stream for stream in (self.manifest.audio_stream, self.manifest.video_stream) if stream.human_name == self.target_stream or not self.target_stream]
+
+        with ThreadPoolExecutor(max_workers=len(streams_to_concat)) as executor:
+            futures = []
+            for stream in streams_to_concat:
+                future = executor.submit(self._concat_stream, stream)
+                futures.append(future)
+
+            for future in futures:
+                future.result()
 
     def _process_streams(self, output_path: str) -> None:
         """Processes the downloaded streams, concatinating, and either muxing or renaming based on target stream."""
@@ -327,28 +340,43 @@ class Downloader:
                     raise
 
     def _download_stream(self, stream: MediaStream, segment_range: tuple[int, int]) -> None:
-        """Download stream segments in given range"""
+        """Download stream segments in given range using threadpool"""
         self.logger.debug(f"Downloading {stream.human_name} stream ID: {stream.stream_id}")
-        # downloading init segment
-        self._download_segment(stream, overwrite=self.overwrite_existing_files)
 
-        # using tqdm object to manipulate progress
-        # and display it as init segment was part of the loop
+        # Download init segment (single thread)
+        self._download_segment(stream, segment_number=None)
 
         segments_to_download = range(segment_range[0], segment_range[1] + 1)
         download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
-        download_bar.update()  # increment by 1
-        for i in segments_to_download:
+        download_bar.update()  # increment by 1 for init segment
+
+        # Lock for thread-safe manifest refresh
+        manifest_lock = Lock()
+
+        def download_task(segment_num):
             try:
-                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
+                self._download_segment(stream, segment_number=segment_num)
             except Forbidden:
-                self.manifest.process_manifest()
-                self.logger.debug("Manifest refreshed")
-                self._download_segment(stream, segment_number=i, overwrite=self.overwrite_existing_files)
-            download_bar.update()
+                with manifest_lock:
+                    self.manifest.process_manifest()
+                    self.logger.debug("Manifest refreshed")
+                    self._download_segment(stream, segment_number=segment_num)
+            return segment_num
+
+        with ThreadPoolExecutor(max_workers=self.threads) as executor:
+            futures = {executor.submit(download_task, i): i for i in segments_to_download}
+
+            for future in as_completed(futures):
+                try:
+                    future.result()  # This will re-raise any exceptions
+                except Exception as e:
+                    self.logger.error(f"Failed to download segment {futures[future]}: {str(e)}")
+                    raise
+                download_bar.update()
+
         download_bar.close()
 
-    def _download_segment(self, stream: MediaStream, segment_number: int | None = None, overwrite: bool = False) -> None:
+    def _download_segment(self, stream: MediaStream, segment_number: int | None = None) -> None:
         """Download and save stream segment"""
         if isinstance(segment_number, int):
             segment_name = f"{stream.media_type}_{stream.stream_id}_{segment_number}"
@@ -357,7 +385,7 @@ class Downloader:
 
         segment_url = f"{self.manifest.base_stream_url}/{segment_name}.mp4d"
         segment_path = os.path.join(self.movie_work_dir, f"{segment_name}.mp4")
-        if os.path.exists(segment_path) and not overwrite:
+        if os.path.exists(segment_path) and not self.overwrite_existing_files:
             self.logger.debug(f"{segment_name} found on disk")
             stream.downloaded_segments.append(segment_path)
             return

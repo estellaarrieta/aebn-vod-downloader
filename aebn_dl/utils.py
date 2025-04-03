@@ -2,6 +2,7 @@ import logging
 import subprocess
 import shutil
 import os
+import re
 import sys
 
 from tqdm import tqdm
@@ -74,11 +75,16 @@ def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str,
         raise FFmpegError(out.stderr)
 
 
-def concat_segments(files, output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
+def natural_sort_key(s):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+
+def concat_segments(files: list[str], output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
     """Concat segments into a single file"""
+    _files = [files[0], *sorted(files[1:], key=natural_sort_key)]
     concat_progress = tqdm(files, desc=f"Joining {tqdm_desc}", disable=silent)
     with open(output_path, "wb") as f:
-        for segment_file_path in files:
+        for segment_file_path in _files:
             with open(segment_file_path, "rb") as segment_file:
                 content = segment_file.read()
                 segment_file.close()

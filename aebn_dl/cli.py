@@ -1,9 +1,6 @@
 import argparse
-import concurrent.futures
 import logging
 import signal
-import sys
-from urllib.parse import urlparse
 from typing import Literal
 
 from . import Downloader
@@ -28,6 +25,7 @@ def download_movie(args):
         log_level=args.log_level,
         keep_logs=args.keep_logs,
         proxy=args.proxy,
+        threads=args.threads,
         proxy_metadata_only=args.proxy_metadata,
     ).run()
 
@@ -66,44 +64,8 @@ def log_error(future):
         logging.error(f"Exception occurred: {e}")
 
 
-def process_list_txt(logger: logging.Logger, args: argparse.Namespace) -> None:
-    if sys.platform == "linux":
-        convert_line_endings("list.txt")  # important to have the proper newlines for linux
-        logger.debug("Converted list.txt to unix line endings, important for linux processing")
-    with open("list.txt", encoding="utf-8") as f:
-        urllist = f.read().splitlines()  # remove the newlines
-    while "" in urllist:  # remove empty strings from the list (resulted from empty lines)
-        urllist.remove("")
-
-    logger.info("""
-\033[0;31m\033[1mWARNING: An excessive concurrent download of scenes/movies
-may result in throttling and/or get your IP blocked.
-HTTP requests to servers usually have rate limits, so hammering a server
-will throttle your connections and cause temporary timeouts.
-Be reasonable and use with caution!\033[0m""")
-
-    default_max_threads = 3
-    max_threads = args.threads or (len(urllist) if len(urllist) < default_max_threads else default_max_threads)
-    logger.info(f"Threads: {max_threads}")
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = []
-        for line in urllist:
-            if line.startswith("#"):
-                continue
-            task_args = argparse.Namespace(**vars(args))  # Create a copy of args
-            if "|" in line:
-                task_args.url = line.split("|")[0]
-                task_args.scene = int(line.split("|")[1])
-            else:
-                task_args.url = line
-            future = executor.submit(download_movie, task_args)
-            future.add_done_callback(log_error)
-            futures.append(future)
-
-
 def main():
-    # Make Ctrl-C work when deamon threads are running
+    # Make Ctrl-C work when threads are running
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     parser = argparse.ArgumentParser()
@@ -132,23 +94,11 @@ def main():
         "If you are really low on disk space, you can use this option but"
         "in case of muxing error you would have to download it all again",
     )
-    parser.add_argument("-t", "--threads", type=int, help="Threads for concurrent downloads with list.txt (default=5)")
+    parser.add_argument("-t", "--threads", type=int, default=5, help="Threads for concurrent downloads (default=5)")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", help="Set the logging level (default: INFO) Any level above INFO would also disable progress bars")
     args = parser.parse_args()
 
-    # validate the url
-    result = urlparse(args.url)
-    if result.scheme and result.netloc:
-        download_movie(args)
-        return
-
-    main_logger = new_logger(args.log_level)
-
-    # if invalid, check for a list.txt and download concurrently
-    if args.url == "list.txt":
-        process_list_txt(main_logger, args=args)
-    else:
-        main_logger.error("Invalid URL or list.txt not passed")
+    download_movie(args)
 
 
 if __name__ == "__main__":
