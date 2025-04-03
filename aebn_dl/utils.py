@@ -1,11 +1,14 @@
 import logging
 import subprocess
-from typing import Optional
 import shutil
+from pathlib import Path
 import os
+import re
 import sys
 
 from tqdm import tqdm
+
+from .movie_scraper import Movie
 
 from .exceptions import FFmpegError
 
@@ -62,24 +65,29 @@ def duration_to_seconds(duration: str) -> int:
     return total_seconds
 
 
-def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str, ffmpeg_dir: Optional[str] = None, silent: bool = False) -> None:
+def ffmpeg_mux_streams(stream_path_1: str, stream_path_2: str, output_path: str, silent: bool = False) -> None:
     """Mux two media streams with ffmpeg"""
     cmd = f'ffmpeg -i "{stream_path_1}" -i "{stream_path_2}" -y -c copy "{output_path}"'
 
     if silent:
         cmd += " -loglevel warning"
 
-    out = subprocess.run(cmd, shell=True, cwd=ffmpeg_dir, capture_output=True, text=True, check=False)
+    out = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=False)
 
     if not out.returncode == 0:
         raise FFmpegError(out.stderr)
 
 
-def concat_segments(files, output_path, tqdm_desc, aggressive_cleaning: bool, silent=False):
+def natural_sort_key(s):
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+
+def concat_segments(files: list[str], output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
     """Concat segments into a single file"""
+    _files = [files[0], *sorted(files[1:], key=natural_sort_key)]
     concat_progress = tqdm(files, desc=f"Joining {tqdm_desc}", disable=silent)
     with open(output_path, "wb") as f:
-        for segment_file_path in files:
+        for segment_file_path in _files:
             with open(segment_file_path, "rb") as segment_file:
                 content = segment_file.read()
                 segment_file.close()
@@ -110,3 +118,64 @@ def ffmpeg_check() -> None:
     """Ensure ffmpeg is available in PATH"""
     if not shutil.which("ffmpeg"):
         raise FileNotFoundError("ffmpeg not found! Please add it to PATH.")
+
+
+def add_metadata(input_path: str | Path, movie: Movie) -> None:
+    """
+    Add title and chapter markers to a video file using ffmpeg based on Movie object.
+    Overwrites the input file.
+
+    Args:
+        input_path: Path to the input video file (will be overwritten)
+        movie: Movie object containing movie metadata
+    """
+    input_path = Path(input_path)
+
+    # Build metadata content
+    metadata_content = ";FFMETADATA1\n\n"
+    metadata_content += f"title={movie.title}\n\n"
+    for i, scene in enumerate(movie.scenes):
+        # Convert timing to milliseconds
+        start_time_ms = scene.start_timing * 1000
+        end_time_ms = scene.end_timing * 1000
+
+        # Add chapter metadata
+        metadata_content += f"[CHAPTER]\nTIMEBASE=1/1000\nSTART={start_time_ms}\nEND={end_time_ms}\ntitle=Scene {i + 1}: {', '.join(scene.performers)}\n\n"
+
+    # Create temporary output path
+    temp_output = input_path.with_stem(f"{input_path.stem}_temp_chaptered")
+
+    try:
+        # Run ffmpeg with metadata piped via stdin
+        cmd = [
+            "ffmpeg",
+            "-i",
+            str(input_path),
+            "-f",
+            "ffmetadata",
+            "-i",
+            "-",  # Read metadata from stdin
+            "-map_metadata",
+            "1",
+            "-c",
+            "copy",  # Stream copy to avoid re-encoding
+            "-y",  # Overwrite output if exists
+            str(temp_output),
+        ]
+
+        # Execute with metadata piped in
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        process.communicate(input=metadata_content.encode("utf-8"))
+
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, cmd)
+
+        # Replace original file with the temporary output
+        os.replace(temp_output, input_path)
+        print(f"Successfully added chapters to {input_path}")
+
+    except Exception as e:
+        # Clean up temp file if something went wrong
+        if temp_output.exists():
+            temp_output.unlink()
+        raise e

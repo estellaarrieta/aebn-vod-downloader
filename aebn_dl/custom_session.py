@@ -1,7 +1,7 @@
 import random
 from time import sleep
 from functools import partialmethod
-from typing import Optional
+from typing import Literal
 
 from curl_cffi import requests as cc_requests
 
@@ -11,16 +11,16 @@ from .exceptions import NetworkError
 class CustomSession(cc_requests.Session):
     """Custom curl_cffi session with retries"""
 
-    def __init__(self, max_retries: Optional[int] = 3, initial_retry_delay: Optional[int] = 1, backoff_factor: Optional[int] = 2, *args, **kwargs):
+    def __init__(self, max_retries: int = 3, initial_retry_delay: int = 1, backoff_factor: int = 2, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.max_retries = max_retries
         self.initial_retry_delay = initial_retry_delay
         self.backoff_factor = backoff_factor
 
-    def custom_request(self, method: str, url: str, *args, **kwargs) -> cc_requests.Response:
+    def custom_request(self, method: Literal["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE"], url: str, *args, **kwargs) -> cc_requests.Response:
         """request wrapper with retries"""
         attempt = 0
-        while attempt < self.max_retries:
+        while True:
             try:
                 return super().request(method, url, *args, **kwargs)
             except cc_requests.RequestsError as e:
