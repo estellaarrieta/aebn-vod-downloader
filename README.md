@@ -1,3 +1,5 @@
+# aebn-vod-downloader
+
 ## Dependencies
 
 - Python 3.10 or higher
@@ -20,12 +22,6 @@ aebndl https://*.aebn.com/*/movies/* --resolution 720 --scene 2
 ```
 
 To download scene 2 in 720p resolution
-
-## Usage
-
-```bash
-aebndl [-h] [-o OUTPUT_DIR] [-w WORK_DIR] [-r RESOLUTION] [-f] [-n] [-s SCENE] [-p PROXY] [-pm] [-c] [-ow] [-ts {audio,video}] [-ks] [-kl] [-ac] [-t THREADS] [-l {DEBUG,INFO,WARNING,ERROR,CRITICAL}] url
-```
 
 ## Arguments
 
