@@ -91,6 +91,7 @@ class Downloader:
         self.movie_work_dir: str | None = None
         self.manifest: Manifest | None = None
         self.session: CustomSession | None = None
+        self.manifest_lock = Lock()
 
     def run(self) -> None:
         """Executes the movie download process."""
@@ -355,29 +356,42 @@ class Downloader:
         download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
         download_bar.update()  # increment by 1 for init segment
 
-        # Lock for thread-safe manifest refresh
-        manifest_lock = Lock()
-
-        def download_task(segment_num):
-            try:
-                self._download_segment(stream, segment_number=segment_num)
-            except Forbidden:
-                with manifest_lock:
-                    self.manifest.process_manifest()
-                    self.logger.debug("Manifest refreshed")
+        def download_task(segment_num: int, max_retries: int = 30) -> int | None:
+            retries = 0
+            while retries <= max_retries:
+                try:
                     self._download_segment(stream, segment_number=segment_num)
-            return segment_num
+                    return segment_num
+                except Exception:
+                    # Only refresh manifest if the lock is acquired immediately
+                    if self.manifest_lock.acquire(blocking=False):
+                        try:
+                            self.manifest.process_manifest()
+                            self.logger.debug(f"Manifest refreshed by segment {segment_num} (attempt {retries + 1})")
+                        finally:
+                            self.manifest_lock.release()
+
+                    else:
+                        self.logger.debug(f"Waiting for manifest refresh {segment_num}")
+                        # If lock was engaged, wait for manifest to be refreshed by another thread
+                        time.sleep(1)
+
+                    retries += 1
+                    if retries == max_retries:
+                        self.logger.error(f"Max retries ({max_retries}) exceeded for segment {segment_num}")
+                        return None
 
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = {executor.submit(download_task, i): i for i in segments_to_download}
 
             for future in as_completed(futures):
                 try:
-                    future.result()  # This will re-raise any exceptions
+                    result = future.result()
+                    if result is not None:
+                        download_bar.update()
                 except Exception as e:
-                    self.logger.error(f"Failed to download segment {futures[future]}: {str(e)}")
-                    raise
-                download_bar.update()
+                    self.logger.error(f"Unexpected error downloading segment {futures[future]}: {str(e)}")
+                    continue
 
         download_bar.close()
 
@@ -407,6 +421,6 @@ class Downloader:
             # segment calc returns a rounded up float which is sometimes bigger than the actual number of segments
             self.logger.debug("Last segment is 404, skipping")
         elif response.status_code == 403:
-            raise Forbidden
+            raise Forbidden(f"Segment {segment_name} Download error! Response Status : {response.status_code}")
         else:
-            raise RuntimeError(f"{segment_name} Download error! Response Status : {response.status_code}")
+            raise RuntimeError(f"Segment {segment_name} Download error! Response Status : {response.status_code}")
