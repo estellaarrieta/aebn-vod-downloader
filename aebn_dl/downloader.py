@@ -1,12 +1,13 @@
 import datetime
 import email.utils as eut
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import os
 import time
-from typing import Literal, Optional
+from typing import Literal
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from . import utils
 from .custom_session import CustomSession
@@ -20,13 +21,13 @@ class Downloader:
     def __init__(
         self,
         url: str,
-        target_height: Optional[int] = None,
-        scene_n: Optional[int] = None,
-        start_segment: Optional[int] = None,
-        end_segment: Optional[int] = None,
-        output_dir: Optional[str] = None,
-        work_dir: Optional[str] = None,
-        proxy: Optional[str] = None,
+        target_height: int | None = None,
+        scene_n: int | None = None,
+        start_segment: int = 0,
+        end_segment: int | None = None,
+        output_dir: str = "",
+        work_dir: str = "",
+        proxy: str = "",
         proxy_metadata_only: bool = False,
         download_covers: bool = False,
         overwrite_existing_files: bool = False,
@@ -290,7 +291,7 @@ class Downloader:
             os.rmdir(self.movie_work_dir)
 
     def _download_streams(self, scraped_movie: Movie) -> None:
-        """Download movie streams"""
+        """Download movie streams concurrently"""
         if self.proxy and self.proxy_metadata_only:
             # disable proxies in session
             self.session.proxies = None
@@ -308,11 +309,22 @@ class Downloader:
 
         self.logger.info(f"Downloading segments {segment_range[0]} - {segment_range[1]}")
 
+        # Determine which streams to download
+        streams_to_download = []
         for stream in (self.manifest.audio_stream, self.manifest.video_stream):
-            if stream.human_name == self.target_stream:
-                self._download_stream(stream, segment_range)
-            elif not self.target_stream:
-                self._download_stream(stream, segment_range)
+            if stream.human_name == self.target_stream or not self.target_stream:
+                streams_to_download.append(stream)
+
+        # Download streams in parallel
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(self._download_stream, stream, segment_range): stream for stream in streams_to_download}
+            for future in as_completed(futures):
+                stream = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    self.logger.error(f"Failed to download {stream.human_name} stream: {str(e)}")
+                    raise
 
     def _download_stream(self, stream: MediaStream, segment_range: tuple[int, int]) -> None:
         """Download stream segments in given range"""
@@ -336,7 +348,7 @@ class Downloader:
             download_bar.update()
         download_bar.close()
 
-    def _download_segment(self, stream: MediaStream, segment_number: Optional[int] = None, overwrite: Optional[bool] = False) -> None:
+    def _download_segment(self, stream: MediaStream, segment_number: int | None = None, overwrite: bool = False) -> None:
         """Download and save stream segment"""
         if isinstance(segment_number, int):
             segment_name = f"{stream.media_type}_{stream.stream_id}_{segment_number}"
