@@ -3,6 +3,7 @@ import email.utils as eut
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
+from pathlib import Path
 
 import os
 import time
@@ -93,7 +94,7 @@ class Downloader:
         self.session: CustomSession | None = None
         self.manifest_lock = Lock()
 
-    def run(self) -> None:
+    def run(self) -> Path:
         """Executes the movie download process."""
         self._initialize_download()
         scraped_movie = self._scrape_movie_info()
@@ -110,6 +111,7 @@ class Downloader:
         if not self.no_metadata:
             utils.add_metadata(output_path, scraped_movie)
         self._cleanup()
+        return Path(output_path)
 
     def _init_new_session(self, use_proxies: bool = True) -> None:
         """Init new curl_cffi session"""
