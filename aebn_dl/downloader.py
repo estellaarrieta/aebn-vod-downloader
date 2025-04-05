@@ -458,13 +458,14 @@ class Downloader:
     def _concat_segments(self, files: list[str], output_path: str, desc: str):
         """Concat segments into a single file"""
         _files = [files[0], *sorted(files[1:], key=utils.natural_sort_key)]
-        task = self.progress.add_task(description=desc)
+        task = self.progress.add_task(description=f"Joining {desc}", total=len(_files))
         with open(output_path, "wb") as f:
             for segment_file_path in _files:
-                with self.progress.open(segment_file_path, "rb", task_id=task) as segment_file:
+                with open(segment_file_path, "rb") as segment_file:
                     content = segment_file.read()
                     segment_file.close()
                     f.write(content)
+                    self.progress.update(task, advance=1)
                 if self.aggressive_segment_cleaning:
                     os.remove(segment_file_path)
         self.progress.update(task, visible=False)
