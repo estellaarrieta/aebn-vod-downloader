@@ -7,7 +7,7 @@ setup(
     install_requires=[
         "lxml",
         "curl_cffi",
-        "tqdm",
+        "rich",
     ],
     extras_require={
         "dev": ["lxml-stubs"],

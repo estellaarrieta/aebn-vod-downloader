@@ -10,7 +10,16 @@ import os
 import time
 from typing import Literal
 
-from tqdm.auto import tqdm
+from contextlib import nullcontext
+from rich.live import Live
+from rich.progress import (
+    SpinnerColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from . import utils
 from .custom_session import CustomSession
@@ -46,6 +55,7 @@ class Downloader:
         no_metadata: bool = False,
         log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
         keep_logs: bool = False,
+        show_progress: bool = True,
     ):
         """
         Args:
@@ -97,26 +107,39 @@ class Downloader:
         self.manifest: Manifest | None = None
         self.session: CustomSession | None = None
         self.manifest_lock = Lock()
+        self.show_progress = show_progress
+        self.progress = self._init_progress()
+
+    def _init_progress(self) -> Progress:
+        return Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+        )
 
     def run(self) -> Path:
         """Executes the movie download process."""
-        self._initialize_download()
-        scraped_movie = self._scrape_movie_info()
-        self._process_manifest(scraped_movie)
-        output_file_name = self._generate_output_name(scraped_movie)
-        self._create_dirs(scraped_movie.movie_id)
-        self._set_stream_paths()
-        if self.download_covers:
-            self._download_movie_covers(scraped_movie)
-        output_path = os.path.join(self.output_dir, output_file_name)
-        self.logger.info(f"Output file name: {output_file_name}")
-        self._download_streams(scraped_movie)
-        self._process_streams(output_path)
-        if not self.no_metadata:
-            self.logger.info("Embedding metadata")
-            utils.add_metadata(output_path, scraped_movie)
-        self._cleanup()
-        return Path(output_path)
+        context = (self.show_progress and Live(self.progress)) or nullcontext()
+        with context:
+            self._initialize_download()
+            scraped_movie = self._scrape_movie_info()
+            self._process_manifest(scraped_movie)
+            output_file_name = self._generate_output_name(scraped_movie)
+            self._create_dirs(scraped_movie.movie_id)
+            self._set_stream_paths()
+            if self.download_covers:
+                self._download_movie_covers(scraped_movie)
+            output_path = os.path.join(self.output_dir, output_file_name)
+            self.logger.info(f"Output file name: {output_file_name}")
+            self._download_streams(scraped_movie)
+            self._process_streams(output_path)
+            if not self.no_metadata:
+                self.logger.info("Embedding metadata")
+                utils.add_metadata(output_path, scraped_movie)
+            self._cleanup()
+            return Path(output_path)
 
     def _init_new_session(self, use_proxies: bool = True) -> None:
         """Init new curl_cffi session"""
@@ -196,12 +219,10 @@ class Downloader:
         """Concat stream segments into a single file"""
         if os.path.exists(stream.path):
             os.remove(stream.path)
-        utils.concat_segments(
+        self._concat_segments(
             files=stream.downloaded_segments,
             output_path=stream.path,
-            tqdm_desc=f"{stream.human_name} segments",
-            aggressive_cleaning=self.aggressive_segment_cleaning,
-            silent=self.is_silent,
+            desc=f"{stream.human_name} segments",
         )
 
     def _concat_streams(self) -> None:
@@ -354,14 +375,16 @@ class Downloader:
 
     def _download_stream(self, stream: MediaStream, segment_range: tuple[int, int]) -> None:
         """Download stream segments in given range using threadpool"""
+        # Initialize progress bar
+        segments_to_download = range(segment_range[0], segment_range[1] + 1)
+
+        task = self.progress.add_task(f"{stream.human_name.capitalize()} download:", total=len(segments_to_download) + 1)
+
         self.logger.debug(f"Downloading {stream.human_name} stream ID: {stream.stream_id}")
 
         # Download init segment (single thread)
         self._download_segment(stream, segment_number=None)
-
-        segments_to_download = range(segment_range[0], segment_range[1] + 1)
-        download_bar = tqdm(total=len(segments_to_download) + 1, desc=stream.human_name.capitalize() + " download", disable=self.is_silent)
-        download_bar.update()  # increment by 1 for init segment
+        self.progress.update(task, advance=1)
 
         def download_task(segment_num: int, max_retries: int = 30) -> int | None:
             retries = 0
@@ -395,12 +418,12 @@ class Downloader:
                 try:
                     result = future.result()
                     if result is not None:
-                        download_bar.update()
+                        self.progress.update(task, advance=1)
                 except Exception as e:
                     self.logger.error(f"Unexpected error downloading segment {futures[future]}: {str(e)}")
                     continue
 
-        download_bar.close()
+        self.progress.update(task, visible=False)
 
     def _download_segment(self, stream: MediaStream, segment_number: int | None = None) -> None:
         """Download and save stream segment"""
@@ -431,3 +454,17 @@ class Downloader:
             raise Forbidden(f"Segment {segment_name} Download error! Response Status : {response.status_code}")
         else:
             raise RuntimeError(f"Segment {segment_name} Download error! Response Status : {response.status_code}")
+
+    def _concat_segments(self, files: list[str], output_path: str, desc: str):
+        """Concat segments into a single file"""
+        _files = [files[0], *sorted(files[1:], key=utils.natural_sort_key)]
+        task = self.progress.add_task(description=desc)
+        with open(output_path, "wb") as f:
+            for segment_file_path in _files:
+                with self.progress.open(segment_file_path, "rb", task_id=task) as segment_file:
+                    content = segment_file.read()
+                    segment_file.close()
+                    f.write(content)
+                if self.aggressive_segment_cleaning:
+                    os.remove(segment_file_path)
+        self.progress.update(task, visible=False)

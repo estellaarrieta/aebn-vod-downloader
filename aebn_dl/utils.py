@@ -82,22 +82,6 @@ def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
 
 
-def concat_segments(files: list[str], output_path: str, tqdm_desc: str, aggressive_cleaning: bool, silent: bool = False):
-    """Concat segments into a single file"""
-    _files = [files[0], *sorted(files[1:], key=natural_sort_key)]
-    concat_progress = tqdm(files, desc=f"Joining {tqdm_desc}", disable=silent)
-    with open(output_path, "wb") as f:
-        for segment_file_path in _files:
-            with open(segment_file_path, "rb") as segment_file:
-                content = segment_file.read()
-                segment_file.close()
-                f.write(content)
-                concat_progress.update()
-            if aggressive_cleaning:
-                os.remove(segment_file_path)
-    concat_progress.close()
-
-
 def is_valid_media(media_bytes: bytes) -> bool:
     """Check if media bytes are are read as valid media with fmmpeg"""
     cmd = "ffmpeg -f mp4 -i pipe:0 -f null -"
