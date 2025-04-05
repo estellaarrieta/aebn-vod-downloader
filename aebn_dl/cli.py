@@ -1,6 +1,5 @@
 import argparse
 import logging
-import signal
 from typing import Literal
 
 from . import Downloader
@@ -66,9 +65,6 @@ def log_error(future):
 
 
 def main():
-    # Make Ctrl-C work when threads are running
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("url", help="URL of the movie or list.txt")
     parser.add_argument("-o", "--output_dir", type=str, help="Specify the output directory")

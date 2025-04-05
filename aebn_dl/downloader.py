@@ -4,6 +4,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 from pathlib import Path
+import signal
 
 import os
 import time
@@ -17,6 +18,9 @@ from .models import MediaStream
 from .movie_scraper import Movie
 from .manifest_parser import Manifest
 from .exceptions import Forbidden
+
+# Make Ctrl-C work when threads are running
+signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
 class Downloader:
