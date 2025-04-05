@@ -23,7 +23,8 @@ def remove_chars(text: str) -> str:
 
 def new_logger(name: str, log_level: str) -> logging.Logger:
     logger = logging.getLogger(name)
-    logger.setLevel(log_level)  # Set the logger level to the lowest (DEBUG)
+    logger.setLevel(logging.DEBUG)  # Set the logger level to the lowest (DEBUG)
+    logger.propagate = False
 
     formatter = logging.Formatter("%(asctime)s|%(levelname)s|%(message)s", datefmt="%H:%M:%S")
 
