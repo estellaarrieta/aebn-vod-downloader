@@ -179,6 +179,7 @@ class Downloader:
 
         print("Scenes and Segment Boundaries:")
         print("---------------------------------")
+        separator = "-" * 46
         for i, scene in enumerate(movie.scenes, 1):
             performers = ", ".join(scene.performers) if scene.performers else "N/A"
             print(f"Scene {i}")
@@ -186,7 +187,7 @@ class Downloader:
             print(f"End time:   {scene.end_timing}s")
             print(f"Segments:   {scene.start_segment} - {scene.end_segment}")
             print(f"Performers: {performers}")
-            print("──────────────────────────────────────────────")
+            print(separator)
 
     def _init_new_session(self, use_proxies: bool = True) -> None:
         """Init new curl_cffi session"""
